@@ -10,12 +10,12 @@
 <style>
 /* Layout idea: 12-column dark dashboard. Summary (overall PSI ring) beside the regional map, then trend + wind, then region tiles and the category key. */
 :root{
-  --bg:#0E1114;
-  --card:#161A1F;
-  --inset:#11151A;
-  --line:#252B33;
+  --bg:#0B1A33;
+  --card:#12264A;
+  --inset:#0E2040;
+  --line:#24406E;
   --ink:#E9EDF1;
-  --muted:#8C96A1;
+  --muted:#93A7C6;
   --accent:#F0A25A;
   --rise:#E8705F; --fall:#4FB3A4;
   --uvhigh:#EE9A3E; --good:#4CB97E; --moderate:#E5C04B; --unhealthy:#E8705F; --vunhealthy:#A57BE0; --hazardous:#D84F7C;
@@ -369,14 +369,14 @@ function drawMap(){
   s+=`<text x="18" y="505" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">SINGAPORE STRAIT</text>`;
   s+=`<g clip-path="url(#land)">`;
   REGIONS.forEach(k=>{const b=band(R[k]);
-    s+=`<path class="region" data-id="${k}" d="${pathOf(AREA[k].poly)}" style="fill:color-mix(in srgb,${col(b.key)} ${series===k?55:34}%,#11151A)" stroke="#11151A" stroke-width="3"/>`;});
+    s+=`<path class="region" data-id="${k}" d="${pathOf(AREA[k].poly)}" style="fill:color-mix(in srgb,${col(b.key)} ${series===k?55:34}%,#0E2040)" stroke="#0E2040" stroke-width="3"/>`;});
   s+=`</g>`;
   s+=`<circle cx="414" cy="347" r="4" fill="var(--muted)"/><line x1="414" y1="352" x2="414" y2="426" stroke="var(--muted)" stroke-dasharray="2 4"/>`;
   REGIONS.forEach(k=>{
     const v=R[k], b=band(v), [x,y]=AREA[k].box, sel=series===k;
     s+=`<g class="region" data-id="${k}" tabindex="0" role="button" aria-pressed="${sel}" aria-label="${NAMES[k]}, 24-hour PSI ${v}, ${b.label}">`;
     if(sel) s+=`<rect x="${x-6}" y="${y-6}" width="112" height="82" rx="12" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
-    s+=`<rect x="${x}" y="${y}" width="100" height="70" rx="8" fill="#161A1F" stroke="${col(b.key)}" stroke-width="2"/>`;
+    s+=`<rect x="${x}" y="${y}" width="100" height="70" rx="8" fill="#12264A" stroke="${col(b.key)}" stroke-width="2"/>`;
     s+=`<text x="${x+50}" y="${y+18}" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" letter-spacing="1.5" fill="var(--muted)">${NAMES[k].toUpperCase()}</text>`;
     s+=`<text x="${x+50}" y="${y+47}" text-anchor="middle" font-family="var(--font-mono)" font-size="28" fill="var(--ink)">${v}</text>`;
     s+=`<text x="${x+50}" y="${y+63}" text-anchor="middle" font-family="var(--font-body)" font-size="11" font-weight="600" fill="${col(b.key)}">${b.label}</text>`;
@@ -542,18 +542,18 @@ function drawUvGauge(){
 }
 function drawUvMap(){
   const has=!!uv, v=has?uv.latest.v:null, b=has?uvBand(v):null;
-  const fill=has?`color-mix(in srgb,${col(b.key)} 42%,#11151A)`:"#1E242B";
+  const fill=has?`color-mix(in srgb,${col(b.key)} 42%,#0E2040)`:"#1A3157";
   let s=`<defs><clipPath id="uvland"><path d="${pathOf(ISLAND)}"/><path d="${pathOf(SENTOSA)}"/></clipPath></defs>`;
   s+=`<text x="407" y="22" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">JOHOR STRAIT</text>`;
   s+=`<text x="18" y="505" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">SINGAPORE STRAIT</text>`;
   s+=`<g clip-path="url(#uvland)">`;
-  REGIONS.forEach(k=>{s+=`<path d="${pathOf(AREA[k].poly)}" style="fill:${fill}" stroke="#11151A" stroke-width="3"/>`;});
+  REGIONS.forEach(k=>{s+=`<path d="${pathOf(AREA[k].poly)}" style="fill:${fill}" stroke="#0E2040" stroke-width="3"/>`;});
   s+=`</g>`;
   // faint region names so the layout reads the same as the PSI map
   REGIONS.filter(k=>k!=="central").forEach(k=>{const [x,y]=AREA[k].box;
     s+=`<text x="${x+50}" y="${k==="south"?y-50:y+40}" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--ink)" opacity=".55">${NAMES[k].toUpperCase()}</text>`;});
   const [x,y]=AREA.central.box, bx=x-25, w=150;
-  s+=`<rect x="${bx}" y="${y-4}" width="${w}" height="80" rx="8" fill="#161A1F" stroke="${has?col(b.key):"var(--line)"}" stroke-width="2"/>`;
+  s+=`<rect x="${bx}" y="${y-4}" width="${w}" height="80" rx="8" fill="#12264A" stroke="${has?col(b.key):"var(--line)"}" stroke-width="2"/>`;
   s+=`<text x="${bx+w/2}" y="${y+15}" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" letter-spacing="1.5" fill="var(--muted)">ISLANDWIDE UV</text>`;
   s+=`<text x="${bx+w/2}" y="${y+48}" text-anchor="middle" font-family="var(--font-mono)" font-size="30" fill="var(--ink)">${has?fmtUv(v):"—"}</text>`;
   s+=`<text x="${bx+w/2}" y="${y+66}" text-anchor="middle" font-family="var(--font-body)" font-size="11.5" font-weight="600" fill="${has?col(b.key):"var(--muted)"}">${has?b.label:"No live reading"}</text>`;
