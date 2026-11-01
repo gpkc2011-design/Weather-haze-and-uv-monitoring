@@ -1,399 +1,532 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PIE &amp; CTE Traffic</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
-<style>
-/* Layout idea: same 12-column blue dashboard as the air-quality app. Average-speed ring beside a live expressway map, then travel times, speed mix, incidents and cameras. */
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cover Finder</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet"><style id="cf-css">
 :root{
-  --bg:#0B1A33;
-  --card:#12264A;
-  --inset:#0E2040;
-  --line:#24406E;
-  --ink:#E9EDF1;
-  --muted:#93A7C6;
-  --accent:#F0A25A;
-  --land:#16305A;
-  --s1:#E0525E; --s2:#E8705F; --s3:#EE9A3E; --s4:#E5C04B; --s5:#B9CF56; --s6:#7CC46A; --s7:#4CB97E; --s8:#3AA67A;
-  --font-body:"Manrope","Segoe UI",system-ui,sans-serif;
-  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
-  color-scheme:dark;
+  --bg:#F4F5F1; --panel:#FFFFFF; --ink:#1E2A2C; --ink2:#55646A; --ink3:#8A979C; --line:#E3E7E2; --line2:#EEF1EC;
+  --teal:#2C7A74; --teal-d:#22625D; --teal-l:#E2F0EE; --teal-ll:#F1F8F7;
+  --hi:#C8553D; --hi-bg:#FBEAE5; --md:#B07A12; --md-bg:#FBF1DB; --lo:#4A8360; --lo-bg:#E5F1E8;
+  --tag:#EEF1F4; --tag-ink:#4D5B66;
+  --r:14px; --sh:0 1px 2px rgba(30,42,44,.05),0 2px 10px rgba(30,42,44,.04);
 }
 *{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
-h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
-.num{font-variant-numeric:tabular-nums}
-.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
-@media (max-width:600px){.wrap{padding:0 14px}}
-
-header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:24px 0 18px}
-header h1{font-size:24px}
-header .sub{color:var(--muted);font-size:13.5px}
-.status{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
-.chip{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:500}
-.chip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
-.chip.live i{background:var(--s7);box-shadow:0 0 0 4px color-mix(in srgb,var(--s7) 22%,transparent)}
-.chip.part i{background:var(--s4)}
-.chip.err i{background:var(--s1)}
-button{font:inherit}
-.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 14px;cursor:pointer;font-weight:500;font-size:13px}
-.btn:hover{border-color:var(--muted)}
-.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
-.btn:focus-visible,.cam:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-
-.notice{display:none;margin:0 0 18px;padding:14px 18px;border-radius:12px;border:1px solid color-mix(in srgb,var(--s4) 40%,var(--line));background:color-mix(in srgb,var(--s4) 8%,var(--card));font-size:14px}
-.notice.show{display:block}
-.notice ul{margin:6px 0 0;padding-left:18px}
-.notice code{font-family:var(--font-mono);font-size:13px;background:var(--inset);padding:1px 6px;border-radius:5px}
-
-.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 18px}
-.toolbar .label{margin-right:4px}
-
-.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;min-width:0}
-.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-6{grid-column:span 6}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}
-@media (max-width:1000px){.span-4,.span-5,.span-6,.span-7,.span-8{grid-column:span 12}}
-.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
-.card-head h2{font-size:16px}
-.card-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
-.label{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
-.pill{display:inline-flex;align-items:center;gap:7px;padding:3px 11px 3px 9px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap}
-.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
-.empty{display:grid;place-items:center;text-align:center;min-height:180px;color:var(--muted);font-size:14px;padding:20px;background:var(--inset);border:1px dashed var(--line);border-radius:12px}
-.mini{background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-.mini .v{font-family:var(--font-mono);font-size:18px;margin-top:2px}
-
-/* gauge */
-.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
-.gauge{width:100%;max-width:300px;height:auto;display:block}
-.gauge-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
-.advice{color:var(--muted);font-size:14px;text-align:center;max-width:38ch;margin:0}
-
-/* map */
-.map-svg{width:100%;height:auto;display:block;background:var(--inset);border:1px solid var(--line);border-radius:12px}
-.map-legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12.5px;color:var(--muted)}
-.map-legend span{display:inline-flex;align-items:center;gap:7px}
-.map-legend i{width:16px;height:4px;border-radius:2px;display:inline-block}
-
-/* travel times */
-.tt{display:grid;gap:18px}
-.tt-dir h3{font-size:14px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
-.tt-dir h3 span{font-family:var(--font-mono);font-weight:500}
-.tt-row{display:grid;grid-template-columns:minmax(120px,1.2fr) 2fr 52px;gap:12px;align-items:center;font-size:13px;padding:5px 0}
-.tt-row .n{color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.tt-track{height:10px;border-radius:5px;background:var(--inset);position:relative}
-.tt-fill{position:absolute;inset:0 auto 0 0;border-radius:5px;background:var(--accent)}
-.tt-row .m{font-family:var(--font-mono);text-align:right}
-@media (max-width:520px){.tt-row{grid-template-columns:1fr 46px}.tt-row .tt-track{grid-column:1/-1;order:3}}
-
-/* distribution */
-.dist{display:grid;gap:16px}
-.dist-row .top{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:6px}
-.stack{display:flex;height:22px;border-radius:7px;overflow:hidden;background:var(--inset)}
-.stack span{height:100%}
-.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:6px}
-@media (max-width:520px){.cats{grid-template-columns:1fr 1fr}}
-
-/* incidents */
-.inc{list-style:none;margin:0;padding:0;display:grid;gap:10px}
-.inc li{background:var(--inset);border:1px solid var(--line);border-left:4px solid var(--s2);border-radius:12px;padding:12px 14px;display:grid;gap:4px}
-.inc .h{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;font-weight:600;font-size:14px}
-.inc .h span{font-family:var(--font-mono);font-weight:500;color:var(--muted);font-size:12.5px}
-.inc p{margin:0;font-size:13.5px;color:var(--muted)}
-
-/* cameras */
-.cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:14px}
-.cam{background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:0;overflow:hidden;cursor:pointer;color:inherit;text-align:left}
-.cam img{display:block;width:100%;aspect-ratio:16/9;object-fit:cover;background:#081428}
-.cam div{padding:8px 12px;display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted)}
-.cam b{color:var(--ink);font-weight:600}
-dialog{border:1px solid var(--line);border-radius:16px;background:var(--card);color:var(--ink);padding:16px;width:min(900px,calc(100% - 24px))}
-dialog::backdrop{background:rgba(5,12,25,.7)}
-dialog img{width:100%;height:auto;display:block;border-radius:10px}
-.dlg-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:12px}
-
-footer{padding:26px 0 44px;color:var(--muted);font-size:13px}
-footer p{margin:0 0 6px;max-width:95ch}
-footer a{color:var(--ink)}
-@media (prefers-reduced-motion: reduce){*{transition:none!important}}
-</style>
-</head>
-<body>
-<div class="wrap">
-  <header>
-    <div>
-      <h1>PIE &amp; CTE Traffic</h1>
-      <div class="sub">Live speeds, travel times, incidents and cameras from LTA</div>
-    </div>
-    <div class="status">
-      <span class="chip" id="chip"><i></i><span id="chipText">Connecting…</span></span>
-      <span id="stamp" class="num"></span>
-      <button class="btn" id="refresh" type="button">Refresh</button>
-    </div>
-  </header>
-
-  <div class="notice" id="notice" role="status"></div>
-
-  <div class="toolbar" role="group" aria-label="Expressway">
-    <span class="label">Show</span>
-    <button class="btn" type="button" data-road="ALL" aria-pressed="true">Both</button>
-    <button class="btn" type="button" data-road="PIE" aria-pressed="false">PIE</button>
-    <button class="btn" type="button" data-road="CTE" aria-pressed="false">CTE</button>
-  </div>
-
-  <main class="grid">
-    <section class="card span-4" aria-labelledby="hSpeed">
-      <div class="card-head"><div><h2 id="hSpeed">Average speed</h2><p>Mean of LTA speed bands across all road segments</p></div></div>
-      <div class="gauge-wrap" id="gauge"><div class="empty" style="width:100%">Loading LTA speed bands…</div></div>
-    </section>
-
-    <section class="card span-8" aria-labelledby="hMap">
-      <div class="card-head">
-        <div><h2 id="hMap">Expressway map</h2><p>Each segment coloured by its LTA speed band. Coastline is approximate.</p></div>
-        <span id="mapTime" class="label"></span>
-      </div>
-      <svg class="map-svg" id="map" viewBox="0 0 900 560" role="img" aria-label="Map of PIE and CTE coloured by current speed"></svg>
-      <div class="map-legend" id="mapLegend"></div>
-    </section>
-
-    <section class="card span-7" aria-labelledby="hTT">
-      <div class="card-head"><div><h2 id="hTT">Estimated travel times</h2><p>LTA estimate for each section, in minutes</p></div></div>
-      <div id="tt" class="tt"><div class="empty">Loading travel times…</div></div>
-    </section>
-
-    <section class="card span-5" aria-labelledby="hDist">
-      <div class="card-head"><div><h2 id="hDist">Speed mix</h2><p>Share of road segments in each speed range</p></div></div>
-      <div id="dist" class="dist"><div class="empty">Loading speed bands…</div></div>
-    </section>
-
-    <section class="card span-12" aria-labelledby="hInc">
-      <div class="card-head"><div><h2 id="hInc">Incidents</h2><p>Current LTA incident reports on PIE and CTE</p></div><span id="incCount" class="label"></span></div>
-      <div id="inc"><div class="empty">Loading incidents…</div></div>
-    </section>
-
-    <section class="card span-12" aria-labelledby="hCam">
-      <div class="card-head"><div><h2 id="hCam">Traffic cameras</h2><p>Latest LTA camera images within 300 m of PIE or CTE. Select one to enlarge.</p></div><span id="camTime" class="label"></span></div>
-      <div id="cams" class="cams"><div class="empty" style="grid-column:1/-1">Loading cameras…</div></div>
-    </section>
-  </main>
-
-  <footer>
-    <p>Source: Land Transport Authority DataMall (traffic speed bands, estimated travel times, traffic incidents) and data.gov.sg (traffic camera images). Readings are shown as published; nothing is estimated or filled in, except that average speed uses the midpoint of each speed band.</p>
-    <p>LTA updates speed bands and travel times every 5 minutes. This page checks every 2 minutes while open.</p>
-  </footer>
-</div>
-
-<dialog id="dlg" aria-labelledby="dlgTitle">
-  <div class="dlg-head"><h2 id="dlgTitle" style="font-size:16px"></h2><button class="btn" type="button" id="dlgClose">Close</button></div>
-  <img id="dlgImg" alt="">
-</dialog>
-
-<script>
+html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Figtree,system-ui,-apple-system,"Segoe UI",sans-serif;font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased}
+button{font:inherit;cursor:pointer;border:0;background:none;color:inherit}
+button:disabled{cursor:not-allowed;opacity:.45}
+select,input{font:inherit;color:inherit}
+.wrap{max-width:1360px;margin:0 auto;padding:20px 22px 60px}
+header.top{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-bottom:6px}
+.brand{display:flex;align-items:center;gap:11px;margin-right:auto}
+.logo{width:38px;height:38px;border-radius:11px;background:var(--teal);display:grid;place-items:center}
+.brand h1{font-size:19px;margin:0;font-weight:700;letter-spacing:-.01em}
+.brand p{margin:0;color:var(--ink2);font-size:13px}
+.roles{display:flex;align-items:center;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:999px;padding:4px}
+.roles span{font-size:12px;color:var(--ink3);padding:0 6px 0 8px}
+.role{padding:5px 11px;border-radius:999px;font-weight:600;font-size:13px;color:var(--ink2)}
+.role:hover{background:var(--line2)}
+.role.on{background:var(--ink);color:#fff}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 13px;border-radius:10px;font-weight:600;font-size:13px;border:1px solid var(--line);background:var(--panel);white-space:nowrap}
+.btn:hover:not(:disabled){border-color:#cfd6d0;background:#FAFBF9}
+.btn.primary{background:var(--teal);border-color:var(--teal);color:#fff}
+.btn.primary:hover:not(:disabled){background:var(--teal-d);border-color:var(--teal-d)}
+.btn.sm{padding:5px 10px;font-size:12.5px;border-radius:8px}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink2)}
+.btn.ghost:hover:not(:disabled){background:var(--line2)}
+.subbar{display:flex;align-items:center;gap:14px;flex-wrap:wrap;color:var(--ink2);font-size:13px;margin:12px 0 18px}
+.subbar .sep{color:var(--line)}
+.live{display:inline-flex;align-items:center;gap:7px;font-weight:500}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--ink3)}
+.live.on .dot{background:#3BA272;box-shadow:0 0 0 3px rgba(59,162,114,.18)}
+.live.saving .dot{background:var(--md)}
+.subbar .actions{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:minmax(0,1fr) 420px;gap:18px;align-items:start}
+@media (max-width:1100px){.grid{grid-template-columns:1fr}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:var(--sh)}
+.panel-h{display:flex;align-items:center;gap:10px;padding:16px 18px 6px}
+.panel-h h2{margin:0;font-size:15px;font-weight:700}
+.panel-h .count{font-size:12px;color:var(--ink3);font-weight:600}
+.panel-h .right{margin-left:auto}
+.board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding:10px 14px 16px}
+@media (max-width:760px){.board{grid-template-columns:1fr}}
+.col{background:#F7F8F5;border:1px solid var(--line2);border-radius:var(--r);padding:10px;min-height:240px;display:flex;flex-direction:column;gap:9px}
+.col-h{display:flex;align-items:center;gap:8px;padding:2px 4px 4px;font-weight:700;font-size:13px}
+.col-h .pip{width:8px;height:8px;border-radius:3px}
+.col-h .n{margin-left:auto;font-size:12px;color:var(--ink3);background:#fff;border:1px solid var(--line);border-radius:999px;padding:0 8px;font-weight:600}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:7px;transition:border-color .15s, box-shadow .15s;border-left:3px solid var(--line)}
+.card.p-High{border-left-color:var(--hi)} .card.p-Medium{border-left-color:var(--md)} .card.p-Low{border-left-color:var(--lo)}
+.card.sel{border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-l)}
+.card.sel.p-High,.card.sel.p-Medium,.card.sel.p-Low{border-left-width:3px}
+.card-top{display:flex;align-items:center;gap:8px}
+.when{font-size:12px;color:var(--ink2);font-weight:500;margin-left:auto}
+.card h4{margin:0;font-size:14px;font-weight:600}
+.badge{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:700;padding:2px 8px;border-radius:999px;letter-spacing:.01em}
+.badge::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.badge.High{background:var(--hi-bg);color:var(--hi)} .badge.Medium{background:var(--md-bg);color:var(--md)} .badge.Low{background:var(--lo-bg);color:var(--lo)}
+button.badge:hover{filter:brightness(.97);outline:1px dashed currentColor;outline-offset:1px}
+.tags{display:flex;flex-wrap:wrap;gap:4px}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:6px;background:var(--tag);color:var(--tag-ink);font-weight:500}
+.tag.match{background:var(--teal-l);color:var(--teal-d);font-weight:600}
+.tag.miss{background:#fff;border:1px dashed #D5DBD7;color:var(--ink3)}
+.card-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:1px}
+.owner{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--ink2);margin-right:auto}
+.av{min-width:22px;height:22px;padding:0 4px;border-radius:11px;display:grid;place-items:center;font-size:9.5px;font-weight:700;color:#fff;letter-spacing:.02em}
+.av.none{background:#fff;border:1px dashed #C9D0CB;color:var(--ink3)}
+.av.TYQ{background:#5B7DB1} .av.DMC{background:#9A6BB0} .av.NC{background:#C07A4F} .av.TKS{background:#3E8E86}
+.repl{font-size:12.5px;background:var(--teal-ll);border-radius:8px;padding:6px 9px;color:var(--teal-d);display:flex;gap:6px;align-items:center}
+.repl.wait{background:var(--md-bg);color:#86600F}
+.repl.ok{background:var(--lo-bg);color:#36694A}
+.empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--ink3);padding:22px 12px;gap:6px;font-size:13px}
+.empty b{color:var(--ink2);font-weight:600;font-size:13.5px}
+.empty svg{opacity:.75;margin-bottom:2px}
+.side{display:flex;flex-direction:column;gap:18px;position:sticky;top:14px}
+@media (max-width:1100px){.side{position:static}}
+.finder-body{padding:6px 18px 18px}
+.task-sum{background:var(--teal-ll);border:1px solid var(--teal-l);border-radius:12px;padding:10px 12px;margin-bottom:12px}
+.task-sum .t{font-weight:700;font-size:14px}
+.task-sum .s{font-size:12.5px;color:var(--ink2)}
+.lbl{font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--ink3);font-weight:700;margin:12px 0 6px}
+.toggle{font-size:12px;padding:3px 9px;border-radius:999px;border:1px solid var(--teal);background:var(--teal);color:#fff;font-weight:600}
+.toggle.off{background:#fff;color:var(--ink3);border-color:var(--line);text-decoration:line-through}
+.cands{display:flex;flex-direction:column;gap:8px}
+.cand{border:1px solid var(--line);border-radius:12px;padding:10px 11px;display:grid;grid-template-columns:24px 1fr auto;gap:4px 10px;align-items:start;position:relative}
+.cand.best{border-color:var(--teal);background:linear-gradient(0deg,#fff,var(--teal-ll))}
+.cand .rk{grid-row:1/3;width:24px;height:24px;border-radius:7px;background:var(--line2);display:grid;place-items:center;font-weight:700;font-size:12px;color:var(--ink2)}
+.cand.best .rk{background:var(--teal);color:#fff}
+.cand .nm{font-weight:600;font-size:14px;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.cand .sc{text-align:right;font-size:12px;color:var(--ink2);white-space:nowrap}
+.cand .sc b{font-size:15px;color:var(--ink)}
+.meter{width:64px;height:5px;background:var(--line2);border-radius:9px;margin:3px 0 0 auto;overflow:hidden}
+.meter i{display:block;height:100%;background:var(--teal);border-radius:9px}
+.cand .row2{grid-column:2/4;display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:space-between}
+.pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:999px}
+.pill.free{background:var(--lo-bg);color:var(--lo)}
+.pill.busy{background:var(--tag);color:var(--ink2)}
+.pill.clash{background:var(--hi-bg);color:var(--hi)}
+.pill.best{background:var(--teal);color:#fff}
+.hint{font-size:12px;color:var(--ink3)}
+.more{width:100%;text-align:center;padding:8px;font-size:12.5px;color:var(--teal-d);font-weight:600;border-radius:10px}
+.more:hover{background:var(--teal-ll)}
+.appr-list{padding:6px 14px 16px;display:flex;flex-direction:column;gap:9px}
+.appr{border:1px solid var(--line);border-radius:12px;padding:11px 12px;display:flex;flex-direction:column;gap:6px}
+.appr .l1{display:flex;align-items:center;gap:8px}
+.appr .l1 b{font-size:14px}
+.appr .l2{font-size:12.5px;color:var(--ink2)}
+.appr .acts{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.banner{font-size:12.5px;border-radius:10px;padding:8px 10px;margin-bottom:10px;background:var(--md-bg);color:#86600F}
+.toast{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:13.5px;font-weight:500;box-shadow:0 8px 30px rgba(0,0,0,.18);opacity:0;transition:all .25s;pointer-events:none;max-width:90vw;z-index:30}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.modal-bg{position:fixed;inset:0;background:rgba(30,42,44,.32);display:grid;place-items:center;z-index:20;padding:16px}
+.modal{background:#fff;border-radius:18px;width:min(420px,100%);padding:20px;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+.modal h3{margin:0 0 4px;font-size:17px}
+.modal p{margin:0 0 14px;color:var(--ink2);font-size:13px}
+.field{display:flex;flex-direction:column;gap:5px;margin-bottom:12px}
+.field label{font-size:12px;font-weight:600;color:var(--ink2)}
+.field select{padding:9px 10px;border:1px solid var(--line);border-radius:10px;background:#fff}
+.modal .acts{display:flex;justify-content:flex-end;gap:8px;margin-top:6px}
+.hero-empty{padding:40px 20px 46px;text-align:center;color:var(--ink2)}
+.hero-empty h3{color:var(--ink);margin:10px 0 6px;font-size:17px}
+.hero-empty .acts{display:flex;gap:8px;justify-content:center;margin-top:14px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.err{background:var(--hi-bg);color:var(--hi);border-radius:10px;padding:9px 12px;font-size:13px;margin-bottom:14px}
+</style></head><body><div id="app"></div><script id="cf-state" type="application/json">null</script><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><script id="cf-code">
 (function(){
-"use strict";
-const $=id=>document.getElementById(id);
-const API="/api/traffic";
-const REFRESH_MS=2*60*1000;
-const SGT="Asia/Singapore";
-const hhmm=iso=>new Date(iso).toLocaleTimeString("en-SG",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:SGT});
+'use strict';
+var DEPLOYERS=['TYQ','DMC','NC','TKS'];
+var LEAD='Lead';
+var SHIFT_OPTS=['AM','PM','NT','Full day'];
+var ABSENT_RE=/^(MC|AL|ABS|ABSENT|UL|HL|CL|EL|LEAVE|SICK)\b/i;
+var MONTHS=['jan','feb','mar','apr','may','jun','jul','aug','sep','oct','nov','dec'];
+var WD=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+var MN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+var FULLMN=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-// ---------- speed bands (LTA v4: band 1 = 0–9 km/h … band 8 = 70+ km/h) ----------
-const SB=[null,
-  {label:"0–9",cat:0},{label:"10–19",cat:0},{label:"20–29",cat:1},{label:"30–39",cat:1},
-  {label:"40–49",cat:2},{label:"50–59",cat:3},{label:"60–69",cat:3},{label:"70+",cat:3}];
-const sbCol=b=>`var(--s${Math.min(8,Math.max(1,b))})`;
-const CATS=[
-  {label:"Jammed",range:"under 20 km/h",col:"var(--s1)",tip:"Stop-start traffic. Expect long delays."},
-  {label:"Slow",range:"20–39 km/h",col:"var(--s3)",tip:"Heavy traffic. Allow extra time."},
-  {label:"Moderate",range:"40–49 km/h",col:"var(--s5)",tip:"Busy but moving."},
-  {label:"Free-flowing",range:"50 km/h and above",col:"var(--s7)",tip:"Traffic is moving well."}];
-const catOfSpeed=v=>v<20?0:v<40?1:v<50?2:3;
-const segSpeed=s=>s.band>=8?(s.min??70):(s.min!=null&&s.max!=null?(s.min+s.max)/2:(s.band-1)*10+5);
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+var store={get:function(k){try{return localStorage.getItem(k);}catch(e){return null;}},set:function(k,v){try{localStorage.setItem(k,v);}catch(e){}}};
+var sess={get:function(k){try{return sessionStorage.getItem(k);}catch(e){return null;}},set:function(k,v){try{if(v==null)sessionStorage.removeItem(k);else sessionStorage.setItem(k,v);}catch(e){}}};
+function pad(n){return (n<10?'0':'')+n;}
+function iso(y,m,d){return y+'-'+pad(m)+'-'+pad(d);}
+function toDate(s){var p=s.split('-');return new Date(+p[0],+p[1]-1,+p[2]);}
+function fmt(s){var d=toDate(s);return WD[d.getDay()]+' '+d.getDate()+' '+MN[d.getMonth()];}
+function todayISO(){var d=new Date();return iso(d.getFullYear(),d.getMonth()+1,d.getDate());}
+function daysBetween(a,b){return Math.round((toDate(b)-toDate(a))/864e5);}
+function autoPriority(date,ref){var n=daysBetween(ref||todayISO(),date);return n<=1?'High':n<=3?'Medium':'Low';}
+function isAbsent(code){return ABSENT_RE.test(code||'');}
+function isWorking(code){code=(code||'').trim();return !!code&&!/^OFF|^RD|^REST|^-$/i.test(code)&&!isAbsent(code);}
+function shiftOf(code){var m=String(code||'').match(/(AM|PM|NT|NIGHT|N)\s*$/i);if(!m)return 'Full day';var s=m[1].toUpperCase();return (s==='NIGHT'||s==='N')?'NT':s;}
+function shiftLabel(s){return s==='Full day'?'Full day':s==='NT'?'Night shift':s+' shift';}
+function initials(n){return n;}
 
-// ---------- projection + approximate geography ----------
-const X=lon=>(lon-103.60)/0.45*900, Y=lat=>(1.48-lat)/0.28*560;
-const pt=([lon,lat])=>`${X(lon).toFixed(1)},${Y(lat).toFixed(1)}`;
-const COAST=[[103.605,1.315],[103.63,1.34],[103.66,1.36],[103.70,1.385],[103.73,1.43],[103.76,1.445],[103.79,1.45],[103.81,1.465],[103.835,1.46],[103.86,1.44],[103.88,1.42],[103.91,1.405],[103.95,1.39],[103.98,1.385],[104.03,1.37],[104.035,1.33],[103.99,1.315],[103.94,1.30],[103.89,1.29],[103.86,1.275],[103.83,1.265],[103.79,1.27],[103.76,1.29],[103.72,1.29],[103.68,1.30],[103.64,1.30]];
-// Approximate routes, drawn only when live segment geometry is not available.
-const ROUTE={
-  PIE:[[103.636,1.327],[103.70,1.343],[103.74,1.336],[103.765,1.335],[103.80,1.325],[103.845,1.330],[103.865,1.322],[103.89,1.330],[103.925,1.335],[103.955,1.350],[103.985,1.355]],
-  CTE:[[103.835,1.400],[103.845,1.375],[103.845,1.340],[103.845,1.330],[103.840,1.300],[103.835,1.280]]};
+/* ---------- sample data ---------- */
+var SAMPLE_STAFF=[
+['Alicia Tan',['Forklift','First Aid','Stocktake']],
+['Ahmad Rizal',['Forklift','Night Ops','Driving']],
+['Benjamin Lim',['Cashier','Customer Service','Food Hygiene']],
+['Chen Wei Ling',['Supervisor','First Aid','Customer Service','Fire Warden']],
+['Daniel Koh',['Forklift','Stocktake','Driving','Fire Warden']],
+['Farah Aziz',['Cashier','Food Hygiene','First Aid']],
+['Gopal Krishnan',['Night Ops','Forklift','Supervisor']],
+['Hui Min Ong',['Customer Service','Cashier','Stocktake']],
+['Ivan Teo',['Driving','Forklift','First Aid']],
+['Jasmine Lee',['Supervisor','Customer Service','Food Hygiene','First Aid']],
+['Kumar Raj',['Stocktake','Night Ops','Fire Warden']],
+['Lim Siew Lan',['Cashier','Customer Service','Supervisor']],
+['Marcus Ng',['Forklift','Driving','Night Ops','Stocktake']],
+['Nurul Huda',['First Aid','Food Hygiene','Customer Service']],
+['Priya Nair',['Fire Warden','First Aid','Supervisor','Stocktake']],
+['Ryan Goh',['Forklift','First Aid','Stocktake','Driving']]
+];
+function buildSample(){
+  var Y=2026,M=11,days=30,rot=['AM','AM','PM','PM','NT','OFF','OFF'];
+  var dates=[];for(var d=1;d<=days;d++)dates.push(iso(Y,M,d));
+  var staff=SAMPLE_STAFF.map(function(s,i){var sched={};dates.forEach(function(dt,di){sched[dt]=rot[(i*3+di+1)%7];});return {name:s[0],skills:s[1].slice(),sched:sched};});
+  var abs=[[0,2,'MC'],[6,3,'MC'],[9,2,'AL'],[12,5,'MC'],[3,1,'MC'],[14,4,'AL'],[1,9,'AL']];
+  var st={v:1,dates:dates,staff:staff,tasks:[],seq:0,updatedAt:0,updatedBy:''};
+  var setup=[{status:'todo'},{status:'todo'},{status:'progress',owner:'DMC'},{status:'todo'},{status:'done',owner:'TKS',pick:true,approve:true},{status:'progress',owner:'NC',pick:true},{status:'todo'}];
+  abs.forEach(function(a,k){
+    var s=staff[a[0]],day=a[1];
+    while(!isWorking(s.sched[iso(Y,M,day)])&&day<days)day++;
+    var dt=iso(Y,M,day),sh=s.sched[dt];s.sched[dt]=a[2]+'-'+sh;
+    var t=newTask(st,s.name,dt,sh,'2026-11-01');var o=setup[k];
+    t.status=o.status;t.owner=o.owner||null;t.createdBy=o.owner||'TYQ';
+    if(o.pick){var r=rankFor(st,t,t.skills).filter(function(c){return !c.covering;})[0];if(r){t.replacement=r.name;t.approval='pending';}}
+    if(o.approve&&t.replacement){t.approval='approved';applyCover(st,t);}
+  });
+  return st;
+}
+function newTask(st,name,date,shift,ref){
+  var s=findStaff(st,name);st.seq=(st.seq||0)+1;
+  var t={id:'t'+st.seq,absentee:name,date:date,shift:shift,skills:s?s.skills.slice():[],priority:autoPriority(date,ref),owner:null,status:'todo',replacement:null,approval:null,createdBy:null};
+  st.tasks.push(t);return t;
+}
+function findStaff(st,name){for(var i=0;i<st.staff.length;i++)if(st.staff[i].name===name)return st.staff[i];return null;}
+function applyCover(st,t){var s=findStaff(st,t.replacement);if(s)s.sched[t.date]=(t.shift==='Full day'?'COVER':t.shift);}
 
-// ---------- state ----------
-let data=null, road="ALL", failure=null;
-const on=r=>road==="ALL"||road===r;
+/* ---------- ranking ---------- */
+function rankFor(st,task,needed){
+  var out=[];
+  st.staff.forEach(function(s){
+    if(s.name===task.absentee)return;
+    var code=(s.sched[task.date]||'').trim();
+    if(isAbsent(code))return;
+    var matched=needed.filter(function(k){return s.skills.indexOf(k)>=0;});
+    var covering=st.tasks.some(function(t){return t.id!==task.id&&t.status!=='done'&&t.replacement===s.name&&t.date===task.date;});
+    var deployed=isWorking(code);
+    var clash=deployed&&(task.shift==='Full day'||shiftOf(code)===task.shift||/COVER/i.test(code));
+    out.push({name:s.name,skills:s.skills,matched:matched,code:code,deployed:deployed,clash:clash,covering:covering});
+  });
+  out.sort(function(a,b){return (b.matched.length-a.matched.length)||(a.covering-b.covering)||(a.deployed-b.deployed)||(a.clash-b.clash)||a.name.localeCompare(b.name);});
+  return out;
+}
 
-// ---------- load ----------
-async function load(){
-  $("chipText").textContent="Checking LTA…";
+/* ---------- state ---------- */
+var embedded=null;try{embedded=JSON.parse(document.getElementById('cf-state').textContent);}catch(e){}
+var state=embedded||buildSample();
+var role=store.get('cf_role');if(DEPLOYERS.concat([LEAD]).indexOf(role)<0)role='TYQ';
+var selId=sess.get('cf_sel');
+var showAll=false;
+var off={};
+var mode='connecting';
+var artifactNS=null,downloadsNS=null,bc=null,pubTimer=null;
+var modal=null;
+var uploadErr='';
+
+var ready=(async function(){
+  await null;
   try{
-    const c=new AbortController(); const t=setTimeout(()=>c.abort(),35000);
-    const r=await fetch(API,{signal:c.signal,headers:{accept:"application/json"}}); clearTimeout(t);
-    if(!r.ok) throw new Error("HTTP "+r.status);
-    data=await r.json(); failure=null;
-  }catch(e){ failure=e; }
+    if(window.claude&&typeof window.claude.use==='function'){
+      var r=await Promise.all([window.claude.use('artifact'),window.claude.use('downloads')]);
+      artifactNS=r[0];downloadsNS=r[1];
+    }
+  }catch(e){}
+  if(artifactNS){mode='live';}
+  else{
+    mode='local';
+    try{var saved=JSON.parse(store.get('cf_state')||'null');if(saved&&saved.staff&&(saved.updatedAt||0)>=(state.updatedAt||0))state=saved;}catch(e){}
+    try{bc=new BroadcastChannel('cover-finder');bc.onmessage=function(){try{var s=JSON.parse(store.get('cf_state')||'null');if(s){state=s;render();}}catch(e){}};}catch(e){}
+    window.addEventListener('storage',function(ev){if(ev.key==='cf_state'&&ev.newValue){try{state=JSON.parse(ev.newValue);render();}catch(e){}}});
+  }
   render();
-}
-
-// ---------- status ----------
-const ERR_LABEL={speedBands:"Speed bands",travelTimes:"Travel times",incidents:"Incidents",cameras:"Cameras"};
-function drawStatus(){
-  const chip=$("chip"), n=$("notice");
-  if(!data){
-    chip.className="chip err"; $("chipText").textContent="No live data";
-    $("stamp").textContent="";
-    n.className="notice show";
-    n.innerHTML=`<b>Live data could not be loaded.</b> This page gets LTA data through its own server function at <code>/api/traffic</code>, which only runs once the folder is deployed to Vercel. In a preview or a file opened from disk, nothing loads, and no readings are made up to fill the gap.`;
-    return;
-  }
-  const errs=Object.entries(data.errors||{});
-  chip.className="chip "+(errs.length?(data.segments.length||data.travelTimes.length?"part":"err"):"live");
-  $("chipText").textContent=errs.length?(data.segments.length?"Partly live · LTA":"LTA data unavailable"):"Live · LTA";
-  $("stamp").textContent=`Fetched ${hhmm(data.fetchedAt)} SGT`;
-  if(!errs.length){n.className="notice";n.innerHTML="";return;}
-  const keyHelp=!data.keyConfigured?`<p style="margin:8px 0 0">Add your LTA DataMall key in Vercel under <b>Settings → Environment Variables</b> as <code>LTA_ACCOUNT_KEY</code>, then redeploy. Keys are free at datamall.lta.gov.sg.</p>`:"";
-  n.className="notice show";
-  n.innerHTML=`<b>Some data did not load.</b><ul>${errs.map(([k,v])=>`<li>${ERR_LABEL[k]||k}: ${v}</li>`).join("")}</ul>${keyHelp}`;
-}
-
-// ---------- gauge ----------
-function arc(cx,cy,r,a0,a1){
-  const p=a=>[cx+r*Math.cos((a-90)*Math.PI/180),cy+r*Math.sin((a-90)*Math.PI/180)];
-  const [x0,y0]=p(a0),[x1,y1]=p(a1);
-  return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${a1-a0>180?1:0} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
-}
-const avg=a=>a.reduce((s,x)=>s+x,0)/a.length;
-function drawGauge(){
-  const segs=data?data.segments.filter(s=>on(s.road)):[];
-  if(!segs.length){
-    $("gauge").innerHTML=`<div class="empty" style="width:100%">${data?"No live speed bands for this selection.":"Average speed appears once live LTA speed bands load."}</div>`; return;
-  }
-  const v=avg(segs.map(segSpeed)), c=catOfSpeed(v), cat=CATS[c];
-  const START=-135,SWEEP=270,gap=2.2, edges=[0,20,40,50,90];
-  const pos=x=>{const i=catOfSpeed(Math.min(x,89.9));return (i+Math.min(1,(x-edges[i])/(edges[i+1]-edges[i])))/4;};
-  let s=`<svg class="gauge" viewBox="0 0 240 228" role="img" aria-label="Average speed ${Math.round(v)} km/h, ${cat.label}">`;
-  CATS.forEach((x,i)=>{const a0=START+SWEEP*i/4+gap/2,a1=START+SWEEP*(i+1)/4-gap/2;
-    s+=`<path d="${arc(120,120,96,a0,a1)}" fill="none" stroke="${x.col}" stroke-width="14" opacity="${i===c?1:.22}"/>`;});
-  const av=START+SWEEP*pos(v);
-  s+=`<path d="${arc(120,120,76,START,Math.max(START+.5,av))}" fill="none" stroke="${cat.col}" stroke-width="5" stroke-linecap="round" opacity=".55"/>`;
-  s+=`<circle cx="${120+96*Math.cos((av-90)*Math.PI/180)}" cy="${120+96*Math.sin((av-90)*Math.PI/180)}" r="10" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/>`;
-  s+=`<text x="120" y="118" text-anchor="middle" font-family="var(--font-mono)" font-size="54" fill="var(--ink)">${Math.round(v)}</text>`;
-  s+=`<text x="120" y="138" text-anchor="middle" font-family="var(--font-mono)" font-size="12" fill="var(--muted)">km/h</text>`;
-  s+=`<text x="120" y="160" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="600" fill="${cat.col}">${cat.label}</text>`;
-  s+=`<text x="40" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">0</text><text x="200" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">90</text></svg>`;
-  const per=["PIE","CTE"].filter(on).map(r=>{const ss=segs.filter(x=>x.road===r);return `<div class="mini"><div class="label">${r}</div><div class="v num">${ss.length?Math.round(avg(ss.map(segSpeed)))+" km/h":"—"}</div></div>`;});
-  const jam=segs.filter(x=>x.band<=2).length;
-  if(per.length<2) per.push(`<div class="mini"><div class="label">Jammed segments</div><div class="v num">${jam} of ${segs.length}</div></div>`);
-  $("gauge").innerHTML=`${s}<p class="advice">${cat.tip} ${jam?`${jam} segment${jam===1?"":"s"} below 20 km/h.`:"No segments below 20 km/h."}</p><div class="gauge-meta">${per.join("")}</div>`;
-}
-
-// ---------- map ----------
-function drawMap(){
-  let s=`<path d="M${COAST.map(pt).join("L")}Z" fill="var(--land)" stroke="var(--line)" stroke-width="1.5"/>`;
-  s+=`<text x="450" y="24" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">JOHOR STRAIT</text>`;
-  s+=`<text x="20" y="540" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">SINGAPORE STRAIT</text>`;
-  const segs=data?data.segments:[];
-  if(segs.length){
-    [...segs].sort((a,b)=>(on(a.road)?1:0)-(on(b.road)?1:0)||b.band-a.band).forEach(g=>{
-      const active=on(g.road);
-      s+=`<line x1="${X(g.a[0]).toFixed(1)}" y1="${Y(g.a[1]).toFixed(1)}" x2="${X(g.b[0]).toFixed(1)}" y2="${Y(g.b[1]).toFixed(1)}" stroke="${active?sbCol(g.band):"var(--line)"}" stroke-width="${active?5:3}" stroke-linecap="round"><title>${g.road}: ${SB[g.band]?SB[g.band].label:"?"} km/h</title></line>`;
-    });
-  }else{
-    Object.entries(ROUTE).forEach(([r,p])=>{ s+=`<polyline points="${p.map(pt).join(" ")}" fill="none" stroke="${on(r)?"var(--muted)":"var(--line)"}" stroke-width="4" stroke-dasharray="6 6" stroke-linecap="round"/>`; });
-    s+=`<text x="450" y="500" text-anchor="middle" font-family="var(--font-body)" font-size="14" fill="var(--muted)">Approximate routes · live speeds appear once LTA data loads</text>`;
-  }
-  // road labels
-  s+=`<g font-family="var(--font-mono)" font-size="13" font-weight="500">
-    <rect x="${X(103.70)-22}" y="${Y(1.343)-34}" width="44" height="22" rx="6" fill="var(--card)" stroke="var(--line)" opacity="${on("PIE")?1:.4}"/><text x="${X(103.70)}" y="${Y(1.343)-18}" text-anchor="middle" fill="var(--ink)" opacity="${on("PIE")?1:.4}">PIE</text>
-    <rect x="${X(103.845)+12}" y="${Y(1.375)-11}" width="44" height="22" rx="6" fill="var(--card)" stroke="var(--line)" opacity="${on("CTE")?1:.4}"/><text x="${X(103.845)+34}" y="${Y(1.375)+5}" text-anchor="middle" fill="var(--ink)" opacity="${on("CTE")?1:.4}">CTE</text></g>`;
-  if(data){
-    data.cameras.filter(c=>on(c.road)).forEach(c=>{
-      s+=`<rect x="${X(c.lon)-4}" y="${Y(c.lat)-4}" width="8" height="8" rx="2" fill="var(--ink)" stroke="var(--bg)" stroke-width="1.5"><title>Camera ${c.id}</title></rect>`;});
-    data.incidents.filter(i=>on(i.road)&&Number.isFinite(i.lat)).forEach(i=>{
-      s+=`<g><circle cx="${X(i.lon)}" cy="${Y(i.lat)}" r="11" fill="var(--s1)" opacity=".25"/><circle cx="${X(i.lon)}" cy="${Y(i.lat)}" r="6" fill="var(--s1)" stroke="var(--bg)" stroke-width="2"/><title>${esc(i.type)}: ${esc(i.message)}</title></g>`;});
-  }
-  $("map").innerHTML=s;
-  $("mapTime").textContent=data&&segs.length?`${hhmm(data.fetchedAt)} SGT`:"";
-  $("mapLegend").innerHTML=[1,3,5,6,8].map(b=>`<span><i style="background:${sbCol(b)}"></i>${b===1?"Under 20":b===3?"20–39":b===5?"40–49":b===6?"50–69":"70+"} km/h</span>`).join("")+
-    `<span><i style="background:var(--ink);width:8px;height:8px;border-radius:2px"></i>Camera</span><span><i style="background:var(--s1);width:10px;height:10px;border-radius:50%"></i>Incident</span>`;
-}
-
-// ---------- travel times ----------
-function drawTT(){
-  const rows=data?data.travelTimes.filter(t=>on(t.road)):[];
-  if(!rows.length){ $("tt").innerHTML=`<div class="empty">${data?"No live travel times for this selection.":"Travel times appear once live LTA data loads."}</div>`; return; }
-  const groups=new Map();
-  rows.forEach(r=>{const k=`${r.road}|${r.direction}`; if(!groups.has(k)) groups.set(k,{road:r.road,farEnd:r.farEnd,rows:[]}); groups.get(k).rows.push(r);});
-  const maxM=Math.max(...rows.map(r=>r.minutes||0),1);
-  $("tt").innerHTML=[...groups.values()].sort((a,b)=>a.road<b.road?-1:1).map(g=>{
-    const total=g.rows.reduce((s,r)=>s+(r.minutes||0),0);
-    return `<div class="tt-dir"><h3>${g.road} towards ${titleCase(g.farEnd)}<span>${total} min total</span></h3>
-      ${g.rows.map(r=>`<div class="tt-row"><span class="n" title="${esc(r.start)} to ${esc(r.end)}">${titleCase(r.start)} → ${titleCase(r.end)}</span>
-        <span class="tt-track"><span class="tt-fill" style="width:${((r.minutes||0)/maxM*100).toFixed(1)}%"></span></span><span class="m num">${r.minutes??"—"} min</span></div>`).join("")}</div>`;
-  }).join("");
-}
-
-// ---------- speed mix ----------
-function drawDist(){
-  const segs=data?data.segments:[];
-  if(!segs.length){ $("dist").innerHTML=`<div class="empty">${data?"No live speed bands yet.":"Speed mix appears once live LTA speed bands load."}</div>`; return; }
-  const roads=["PIE","CTE"].filter(on);
-  let h=roads.map(r=>{
-    const ss=segs.filter(s=>s.road===r); if(!ss.length) return `<div class="dist-row"><div class="top"><b>${r}</b><span>No segments</span></div></div>`;
-    const counts=CATS.map((_,i)=>ss.filter(s=>catOfSpeed(segSpeed(s))===i).length);
-    return `<div class="dist-row"><div class="top"><b>${r}</b><span class="num" style="color:var(--muted)">${ss.length} segments</span></div>
-      <div class="stack" role="img" aria-label="${r}: ${CATS.map((c,i)=>`${c.label} ${Math.round(counts[i]/ss.length*100)}%`).join(", ")}">${counts.map((n,i)=>n?`<span style="width:${(n/ss.length*100).toFixed(2)}%;background:${CATS[i].col}" title="${CATS[i].label}: ${n}"></span>`:"").join("")}</div></div>`;
-  }).join("");
-  const all=segs.filter(s=>on(s.road));
-  h+=`<div class="cats">${CATS.map((c,i)=>{const n=all.filter(s=>catOfSpeed(segSpeed(s))===i).length;return `<div class="mini" style="border-left:4px solid ${c.col}"><div class="label">${c.label}</div><div class="v num">${all.length?Math.round(n/all.length*100):0}%</div><div style="font-size:11.5px;color:var(--muted)">${c.range}</div></div>`;}).join("")}</div>`;
-  $("dist").innerHTML=h;
-}
-
-// ---------- incidents ----------
-function drawInc(){
-  if(!data||(data.errors&&data.errors.incidents)){ $("inc").innerHTML=`<div class="empty">${data?"Incident reports did not load.":"Incidents appear once live LTA data loads."}</div>`; $("incCount").textContent=""; return; }
-  const list=data.incidents.filter(i=>on(i.road));
-  $("incCount").textContent=`${list.length} reported`;
-  if(!list.length){ $("inc").innerHTML=`<div class="empty" style="min-height:90px">No incidents reported on ${road==="ALL"?"PIE or CTE":road} right now.</div>`; return; }
-  $("inc").innerHTML=`<ul class="inc">${list.map(i=>{const m=i.message.match(/^\((\d+\/\d+)\)\s*(\d{1,2}:\d{2})\s*/);
-    return `<li style="border-left-color:${/accident|breakdown|obstacle/i.test(i.type)?"var(--s1)":"var(--s3)"}"><div class="h">${esc(i.type)} · ${i.road}<span>${m?`${m[2]} · ${m[1]}`:""}</span></div><p>${esc(m?i.message.slice(m[0].length):i.message)}</p></li>`;}).join("")}</ul>`;
-}
-
-// ---------- cameras ----------
-function drawCams(){
-  if(!data){ $("cams").innerHTML=`<div class="empty" style="grid-column:1/-1">Camera images appear once the page is deployed with its server function.</div>`; $("camTime").textContent=""; return; }
-  if(data.errors&&data.errors.cameras){ $("cams").innerHTML=`<div class="empty" style="grid-column:1/-1">Camera images did not load.</div>`; return; }
-  const list=data.cameras.filter(c=>on(c.road));
-  if(!list.length){ $("cams").innerHTML=`<div class="empty" style="grid-column:1/-1">${data.segments.length?"No cameras found near this expressway.":"Cameras are matched to PIE and CTE using live road geometry, which needs the LTA key."}</div>`; return; }
-  $("camTime").textContent=data.camerasTimestamp?`${hhmm(data.camerasTimestamp)} SGT`:"";
-  $("cams").innerHTML=list.map(c=>`<button class="cam" type="button" data-img="${esc(c.image)}" data-title="${c.road} · camera ${esc(c.id)}"><img src="${esc(c.image)}" alt="Traffic camera ${esc(c.id)} on ${c.road}" loading="lazy"><div><b>${c.road}</b><span class="num">#${esc(c.id)} · ${hhmm(c.timestamp)}</span></div></button>`).join("");
-  $("cams").querySelectorAll(".cam").forEach(b=>b.addEventListener("click",()=>{
-    $("dlgTitle").textContent=b.dataset.title; $("dlgImg").src=b.dataset.img; $("dlgImg").alt=b.dataset.title;
-    try{$("dlg").showModal()}catch(e){$("dlg").setAttribute("open","")}
-  }));
-}
-
-// ---------- utils ----------
-function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
-const CODES=/\b(Aye|Sle|Pie|Cte|Ecp|Kpe|Tpe|Bke|Kje|Mce|Nsc|Cbd)\b/g;
-function titleCase(s){return esc(String(s||"").toLowerCase().replace(/\b\w/g,c=>c.toUpperCase()).replace(CODES,m=>m.toUpperCase()));}
-
-function render(){drawStatus();drawGauge();drawMap();drawTT();drawDist();drawInc();drawCams();}
-document.querySelectorAll("[data-road]").forEach(b=>b.addEventListener("click",()=>{
-  road=b.dataset.road; document.querySelectorAll("[data-road]").forEach(x=>x.setAttribute("aria-pressed",String(x===b))); render();
-}));
-$("refresh").addEventListener("click",load);
-$("dlgClose").addEventListener("click",()=>$("dlg").close());
-$("dlg").addEventListener("click",e=>{if(e.target===$("dlg"))$("dlg").close()});
-drawMap();
-load();
-setInterval(load,REFRESH_MS);
 })();
-</script>
-</body>
-</html>
+
+function buildDoc(){
+  var css=document.getElementById('cf-css').textContent;
+  var code=document.getElementById('cf-code').textContent;
+  var json=JSON.stringify(state).replace(/</g,'\\u003c');
+  var S='<'+'script',E='<'+'/script>';
+  return '<!DOCTYPE html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Cover Finder</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet"><style id="cf-css">'+css+'</style></head><body><div id="app"></div>'+S+' id="cf-state" type="application/json">'+json+E+S+' src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">'+E+S+' id="cf-code">'+code+E+'</body></html>';
+}
+
+function commit(msg){
+  state.updatedAt=Date.now();state.updatedBy=role;
+  render();
+  ready.then(function(){
+    if(mode==='live'){
+      if(msg)sess.set('cf_toast',msg);
+      clearTimeout(pubTimer);setLive('saving');
+      pubTimer=setTimeout(doPublish,250);
+    }else{
+      if(msg)toast(msg);
+      store.set('cf_state',JSON.stringify(state));
+      if(bc)try{bc.postMessage('sync');}catch(e){}
+    }
+  });
+}
+async function doPublish(){
+  try{await artifactNS.publish(buildDoc());}
+  catch(e){
+    var c=e&&e.code;sess.set('cf_toast',null);
+    if(c==='conflict'){toast('Someone else just made a change — showing their latest.');}
+    else if(c==='not_granted'||c==='not_writer'){mode='readonly';render();toast("You're in view-only mode, so that change wasn't saved.");}
+    else{setLive('live');toast("Couldn't save just now — please try that again.");}
+  }
+}
+
+/* ---------- actions ---------- */
+function task(id){for(var i=0;i<state.tasks.length;i++)if(state.tasks[i].id===id)return state.tasks[i];return null;}
+function isDeployer(){return DEPLOYERS.indexOf(role)>=0;}
+function canAssign(t){return isDeployer()&&t&&t.status!=='done'&&(!t.owner||t.owner===role);}
+
+var A={
+  role:function(el){role=el.dataset.v;store.set('cf_role',role);render();},
+  select:function(el){selId=el.dataset.id;off={};showAll=false;sess.set('cf_sel',selId);render();var f=document.getElementById('finder');if(f&&window.innerWidth<1100)f.scrollIntoView({behavior:'smooth',block:'start'});},
+  take:function(el){var t=task(el.dataset.id);if(!t||!isDeployer())return;t.owner=role;t.status='progress';selId=t.id;sess.set('cf_sel',selId);commit("It's yours, "+role+". Pick a replacement from the finder.");},
+  prio:function(el){var t=task(el.dataset.id);if(!t)return;var o=['High','Medium','Low'];t.priority=o[(o.indexOf(t.priority)+1)%3];commit();},
+  skill:function(el){var k=el.dataset.v;off[k]=!off[k];render();},
+  more:function(){showAll=!showAll;render();},
+  assign:function(el){var t=task(selId);if(!canAssign(t))return;t.replacement=el.dataset.name;t.owner=t.owner||role;t.status='progress';t.approval='pending';commit('Nice — '+t.replacement+' is pencilled in. Waiting on the team lead.');},
+  approve:function(el){var t=task(el.dataset.id);if(!t||role!==LEAD)return;t.status='done';t.approval='approved';applyCover(state,t);if(selId===t.id){selId=null;sess.set('cf_sel',null);}commit('Approved. '+t.replacement+' is on for '+fmt(t.date)+'.');},
+  back:function(el){var t=task(el.dataset.id);if(!t||role!==LEAD)return;var who=t.replacement;t.replacement=null;t.approval=null;t.status='progress';commit('Sent back — '+(t.owner||'the owner')+' can pick someone other than '+who+'.');},
+  cleardone:function(){state.tasks=state.tasks.filter(function(t){return t.status!=='done';});commit('Done column cleared.');},
+  report:function(){modal={staff:(state.staff[0]||{}).name||'',date:pickDefaultDate()};render();},
+  closemodal:function(){modal=null;render();},
+  savereport:function(){
+    var name=document.getElementById('m-staff').value,date=document.getElementById('m-date').value,shift=document.getElementById('m-shift').value,prio=document.getElementById('m-prio').value;
+    if(!name||!date)return;
+    var t=newTask(state,name,date,shift);t.priority=prio;t.createdBy=role;
+    modal=null;selId=t.id;sess.set('cf_sel',selId);off={};
+    commit('Added to To do. The finder already has suggestions for '+name.split(' ')[0]+"'s shift.");
+  },
+  upload:function(){document.getElementById('file').click();},
+  sample:function(){downloadRoster();},
+  loadsample:function(){var s=buildSample();state.dates=s.dates;state.staff=s.staff;state.tasks=s.tasks;state.seq=s.seq;selId=null;commit('Sample roster loaded — TYQ, DMC, NC and TKS each have something to look at.');}
+};
+function pickDefaultDate(){var t=todayISO();return state.dates.indexOf(t)>=0?t:state.dates[0];}
+
+document.addEventListener('click',function(e){if(e.target.id==='modal-bg'){modal=null;render();return;}var el=e.target.closest('[data-act]');if(!el||el.disabled)return;var f=A[el.dataset.act];if(f){e.preventDefault();f(el);}});
+document.addEventListener('change',function(e){
+  if(e.target.id==='file'){var f=e.target.files[0];e.target.value='';if(f)readFile(f);}
+  if(e.target.id==='m-staff'||e.target.id==='m-date'){var n=document.getElementById('m-staff').value,d=document.getElementById('m-date').value;var s=findStaff(state,n);var code=s?s.sched[d]:'';document.getElementById('m-shift').value=isWorking(code)?shiftOf(code):(isAbsent(code)?shiftOf(code):'Full day');document.getElementById('m-prio').value=autoPriority(d);document.getElementById('m-hint').textContent=s?(n.split(' ')[0]+' is rostered '+(code||'nothing')+' on '+fmt(d)+'.'):'';modal.staff=n;modal.date=d;}
+});
+document.addEventListener('keydown',function(e){if(e.key==='Escape'&&modal){modal=null;render();}});
+
+/* ---------- Excel ---------- */
+function readFile(f){
+  if(typeof XLSX==='undefined'){uploadErr='The spreadsheet reader is still loading — give it a second and try again.';render();return;}
+  var r=new FileReader();
+  r.onload=function(){
+    try{
+      var res=parseWorkbook(new Uint8Array(r.result));
+      state.dates=res.dates;state.staff=res.staff;
+      state.tasks=state.tasks.filter(function(t){return res.dates.indexOf(t.date)>=0&&!!findStaff(state,t.absentee);});
+      var added=0;
+      res.staff.forEach(function(s){res.dates.forEach(function(d){var c=s.sched[d];if(isAbsent(c)){var sh=shiftOf(c);var exists=state.tasks.some(function(t){return t.absentee===s.name&&t.date===d;});if(!exists){var t=newTask(state,s.name,d,sh);t.createdBy=role;added++;}}});});
+      uploadErr='';selId=null;sess.set('cf_sel',null);
+      var m=toDate(res.dates[0]);
+      commit('Loaded '+res.staff.length+' staff for '+FULLMN[m.getMonth()]+' '+m.getFullYear()+(added?' — '+added+' absence'+(added>1?'s':'')+' added to To do.':'.'));
+    }catch(err){uploadErr=err.message||String(err);render();}
+  };
+  r.readAsArrayBuffer(f);
+}
+function parseWorkbook(buf){
+  var wb=XLSX.read(buf,{type:'array',cellDates:true});
+  var ws=wb.Sheets[wb.SheetNames[0]];
+  var rows=XLSX.utils.sheet_to_json(ws,{header:1,raw:true,defval:''});
+  var nameRe=/^\s*(staff\s*)?(full\s*)?name\s*$/i;
+  var h=-1;for(var i=0;i<Math.min(rows.length,30);i++){if(rows[i].some(function(c){return nameRe.test(String(c));})){h=i;break;}}
+  if(h<0)throw new Error("Hmm, I couldn't find a “Name” column. Check the header row has Name, Skills, then one column per date.");
+  var head=rows[h];
+  var nameCol=head.findIndex(function(c){return nameRe.test(String(c));});
+  var skillCol=head.findIndex(function(c){return /skill/i.test(String(c));});
+  if(skillCol<0)throw new Error("I found names but no “Skills” column. Add one with skills separated by commas.");
+  var ctx=null;
+  head.forEach(function(c,i){if(ctx||i===nameCol||i===skillCol)return;var d=parseHeaderDate(c,null);if(d)ctx={y:+d.slice(0,4),m:+d.slice(5,7)};});
+  if(!ctx){var n=new Date();ctx={y:n.getFullYear(),m:n.getMonth()+1};}
+  var cols=[];
+  head.forEach(function(c,i){if(i===nameCol||i===skillCol)return;var d=parseHeaderDate(c,ctx);if(d)cols.push([i,d]);});
+  if(!cols.length)throw new Error("I couldn't read any dates in the header row. Use real dates or labels like “1 Nov”.");
+  var staff=[];
+  rows.slice(h+1).forEach(function(r){
+    var name=String(r[nameCol]||'').trim();if(!name)return;
+    var skills=String(r[skillCol]||'').split(/[,;\/|\n]+/).map(function(x){return x.trim();}).filter(Boolean).map(tidySkill);
+    var sched={};cols.forEach(function(c){var v=String(r[c[0]]==null?'':r[c[0]]).trim().toUpperCase();if(v)sched[c[1]]=v;});
+    staff.push({name:name,skills:skills,sched:sched});
+  });
+  if(!staff.length)throw new Error('The sheet has headers but no staff rows underneath.');
+  var dates=cols.map(function(c){return c[1];}).filter(function(d,i,a){return a.indexOf(d)===i;}).sort();
+  return {staff:staff,dates:dates};
+}
+function tidySkill(s){return s.replace(/\s+/g,' ').replace(/\b\w/g,function(c){return c.toUpperCase();});}
+function parseHeaderDate(c,ctx){
+  if(c instanceof Date&&!isNaN(c)){var t=new Date(c.getTime()+12*36e5);return iso(t.getFullYear(),t.getMonth()+1,t.getDate());}
+  if(typeof c==='number'){
+    if(c>20000&&c<80000&&XLSX.SSF){var p=XLSX.SSF.parse_date_code(c);return iso(p.y,p.m,p.d);}
+    if(ctx&&c>=1&&c<=31&&c===Math.floor(c))return iso(ctx.y,ctx.m,c);
+    return null;
+  }
+  var s=String(c).trim();if(!s)return null;var m;
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return iso(+m[1],+m[2],+m[3]);
+  if((m=s.match(/^(\d{1,2})[-\/.](\d{1,2})[-\/.](\d{2,4})$/))){var y=+m[3];if(y<100)y+=2000;return iso(y,+m[2],+m[1]);}
+  if((m=s.match(/(\d{1,2})(?:st|nd|rd|th)?[\s\-]*(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?(?:[\s\-,]*(\d{2,4}))?/i))){var mo=MONTHS.indexOf(m[2].toLowerCase())+1;var yy=m[3]?(+m[3]<100?+m[3]+2000:+m[3]):(ctx?ctx.y:new Date().getFullYear());return iso(yy,mo,+m[1]);}
+  if(ctx&&(m=s.match(/^(?:[a-z]{3}\s+)?(\d{1,2})$/i))&&+m[1]<=31)return iso(ctx.y,ctx.m,+m[1]);
+  return null;
+}
+async function downloadRoster(){
+  if(typeof XLSX==='undefined'){toast('The spreadsheet tools are still loading — try again in a moment.');return;}
+  var aoa=[['Name','Skills'].concat(state.dates.map(function(d){return toDate(d);}))];
+  state.staff.forEach(function(s){aoa.push([s.name,s.skills.join(', ')].concat(state.dates.map(function(d){return s.sched[d]||'';})));});
+  var ws=XLSX.utils.aoa_to_sheet(aoa,{cellDates:true,dateNF:'d-mmm'});
+  ws['!cols']=[{wch:18},{wch:40}].concat(state.dates.map(function(){return {wch:7};}));
+  var wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Roster');
+  var out=XLSX.write(wb,{bookType:'xlsx',type:'array'});
+  var m=toDate(state.dates[0]);var fname='roster-'+MN[m.getMonth()].toLowerCase()+'-'+m.getFullYear()+'.xlsx';
+  if(downloadsNS){try{await downloadsNS.save({filename:fname,data:out});toast('Roster saved — edit it in Excel and upload it back any time.');}catch(e){if(e&&e.code!=='declined')toast("Couldn't save the file here.");}}
+  else{try{var url=URL.createObjectURL(new Blob([out],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));var a=document.createElement('a');a.href=url;a.download=fname;document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},2000);}catch(e){toast("Downloads aren't available in this view.");}}
+}
+
+/* ---------- render ---------- */
+var ICON={
+  logo:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 19c.6-3.2 2.8-5 5.5-5s4.9 1.8 5.5 5"/><path d="M16 11.5l2 2 3.5-4"/></svg>',
+  up:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"/></svg>',
+  down:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M6 10l6 6 6-6M4 20h16"/></svg>',
+  plus:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>',
+  search:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4-4"/></svg>',
+  sun:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>',
+  flow:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h12M12 6l6 6-6 6"/></svg>',
+  check:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.5L16 9.5"/></svg>',
+  people:'<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.4"/><path d="M3.5 19c.6-3 2.8-4.7 5.5-4.7s4.9 1.7 5.5 4.7M15 14.6c2.6-.3 4.8 1.2 5.5 4.4"/></svg>',
+  inbox:'<svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 13l3-8h12l3 8v6H3z"/><path d="M3 13h5l1.5 2h5L16 13h5"/></svg>'
+};
+function av(o){return o?'<span class="av '+esc(o)+'">'+esc(o)+'</span>':'<span class="av none">?</span>';}
+function tagList(skills,matched){return '<div class="tags">'+skills.map(function(k){return '<span class="tag'+(matched&&matched.indexOf(k)>=0?' match':'')+'">'+esc(k)+'</span>';}).join('')+'</div>';}
+
+function render(){
+  var app=document.getElementById('app');
+  var focus=document.activeElement&&document.activeElement.id;
+  var html='<div class="wrap">'+renderHeader()+renderSubbar();
+  if(!state.staff.length){html+=renderNoRoster();}
+  else html+='<div class="grid"><section class="panel">'+renderBoard()+'</section><aside class="side">'+renderFinder()+renderPending()+'</aside></div>';
+  html+='</div><input type="file" id="file" class="sr" accept=".xlsx,.xls,.csv">'+(modal?renderModal():'')+'<div class="toast" id="toast"></div>';
+  app.innerHTML=html;
+  if(focus&&document.getElementById(focus))document.getElementById(focus).focus();
+}
+function renderHeader(){
+  var roles=DEPLOYERS.concat([LEAD]).map(function(r){return '<button class="role'+(r===role?' on':'')+'" data-act="role" data-v="'+r+'">'+(r===LEAD?'Team lead':r)+'</button>';}).join('');
+  return '<header class="top"><div class="brand"><div class="logo">'+ICON.logo+'</div><div><h1>Cover Finder</h1><p>Find the best-fit replacement in under two minutes.</p></div></div><div class="roles" role="group" aria-label="Who is using this"><span>I’m</span>'+roles+'</div></header>';
+}
+function renderSubbar(){
+  var live=mode==='live'?'<span class="live on" id="live"><span class="dot"></span>Live — everyone sees changes instantly</span>':mode==='readonly'?'<span class="live"><span class="dot"></span>View only</span>':mode==='local'?'<span class="live"><span class="dot"></span>Preview — changes sync across tabs in this browser</span>':'<span class="live" id="live"><span class="dot"></span>Connecting…</span>';
+  var info='';
+  if(state.dates.length){var m=toDate(state.dates[0]);info='<span>'+FULLMN[m.getMonth()]+' '+m.getFullYear()+' roster · '+state.staff.length+' staff</span><span class="sep">|</span><span>Today: '+fmt(todayISO())+'</span><span class="sep">|</span>';}
+  var acts='<div class="actions">'+(state.staff.length?'<button class="btn" data-act="sample">'+ICON.down+'Get roster (.xlsx)</button>':'')+'<button class="btn" data-act="upload">'+ICON.up+'Upload roster</button>'+(state.staff.length?'<button class="btn primary" data-act="report"'+(isDeployer()?'':' disabled title="Switch to a deployer to report an absence"')+'>'+ICON.plus+'Report absence</button>':'')+'</div>';
+  return '<div class="subbar">'+info+live+acts+'</div>'+(uploadErr?'<div class="err">'+esc(uploadErr)+'</div>':'');
+}
+function renderNoRoster(){
+  return '<section class="panel hero-empty">'+ICON.people+'<h3>Let’s get your roster in</h3><div>Upload this month’s deployment Excel (Name, Skills, then one column per date) and I’ll do the matching.</div><div class="acts"><button class="btn primary" data-act="upload">'+ICON.up+'Upload roster</button><button class="btn" data-act="loadsample">Try the sample</button></div></section>';
+}
+function renderBoard(){
+  var order={High:0,Medium:1,Low:2};
+  var cols=[['todo','To do','#8A979C'],['progress','In progress','#2C7A74'],['done','Done','#4A8360']];
+  var empties={
+    todo:[ICON.sun,'All clear!','Nobody needs cover right now. Enjoy the calm.'],
+    progress:[ICON.flow,'Nothing in motion','Grab a to-do with “Take it” to get started.'],
+    done:[ICON.check,'No finished cover yet','Approved replacements land here.']
+  };
+  var doneN=state.tasks.filter(function(t){return t.status==='done';}).length;
+  var h='<div class="panel-h"><h2>Status board</h2><span class="count">'+state.tasks.filter(function(t){return t.status!=='done';}).length+' open</span><span class="right">'+(doneN?'<button class="btn ghost sm" data-act="cleardone">Clear done</button>':'')+'</span></div><div class="board">';
+  cols.forEach(function(c){
+    var list=state.tasks.filter(function(t){return t.status===c[0];}).sort(function(a,b){return (order[a.priority]-order[b.priority])||a.date.localeCompare(b.date);});
+    h+='<div class="col"><div class="col-h"><span class="pip" style="background:'+c[2]+'"></span>'+c[1]+'<span class="n">'+list.length+'</span></div>';
+    if(!list.length){var e=empties[c[0]];h+='<div class="empty">'+e[0]+'<b>'+e[1]+'</b><span>'+e[2]+'</span></div>';}
+    list.forEach(function(t){h+=renderCard(t);});
+    h+='</div>';
+  });
+  return h+'</div>';
+}
+function renderCard(t){
+  var sel=t.id===selId&&t.status!=='done';
+  var h='<article class="card p-'+t.priority+(sel?' sel':'')+'">';
+  h+='<div class="card-top">'+(t.status==='done'?'<span class="badge '+t.priority+'">'+t.priority+'</span>':'<button class="badge '+t.priority+'" data-act="prio" data-id="'+t.id+'" title="Tap to change priority">'+t.priority+'</button>')+'<span class="when">'+fmt(t.date)+' · '+esc(t.shift)+'</span></div>';
+  h+='<h4>Cover for '+esc(t.absentee)+'</h4>'+tagList(t.skills);
+  if(t.replacement){
+    if(t.approval==='approved')h+='<div class="repl ok">✓ '+esc(t.replacement)+' approved</div>';
+    else h+='<div class="repl wait">'+esc(t.replacement)+' · waiting for approval</div>';
+  }
+  h+='<div class="card-foot"><span class="owner">'+av(t.owner)+(t.owner?esc(t.owner):'Unclaimed')+'</span>';
+  if(t.status==='todo'&&!t.owner)h+='<button class="btn sm" data-act="take" data-id="'+t.id+'"'+(isDeployer()?'':' disabled title="Switch to a deployer to claim"')+'>Take it</button>';
+  if(t.status!=='done')h+='<button class="btn sm'+(sel?' primary':'')+'" data-act="select" data-id="'+t.id+'">'+ICON.search+(t.replacement?'Change':'Find cover')+'</button>';
+  return h+'</div></article>';
+}
+function renderFinder(){
+  var t=task(selId);
+  if(t&&t.status==='done')t=null;
+  var h='<section class="panel" id="finder"><div class="panel-h"><h2>Staff finder</h2></div><div class="finder-body">';
+  if(!t){return h+'<div class="empty" style="padding:26px 10px">'+ICON.search.replace('15','30').replace('15','30')+'<b>Who should cover?</b><span>Tap “Find cover” on any card and I’ll rank the team by matching skills, then by who’s free that day.</span></div></div></section>';}
+  var needed=t.skills.filter(function(k){return !off[k];});
+  var ranked=rankFor(state,t,needed);
+  h+='<div class="task-sum"><div class="t">Cover for '+esc(t.absentee)+'</div><div class="s">'+fmt(t.date)+' · '+shiftLabel(t.shift)+' · owner '+(t.owner?esc(t.owner):'unclaimed')+'</div></div>';
+  if(t.replacement&&t.approval==='pending')h+='<div class="banner">'+esc(t.replacement)+' is waiting for approval. Assign someone else to swap.</div>';
+  if(!canAssign(t)){
+    var why=role===LEAD?'You’re viewing as team lead — switch to a deployer to assign.':(t.owner&&t.owner!==role?esc(t.owner)+' owns this one, so only they can assign.':'');
+    if(why)h+='<div class="banner" style="background:var(--tag);color:var(--ink2)">'+why+'</div>';
+  }
+  h+='<div class="lbl">Skills needed · tap to loosen</div><div class="tags">'+t.skills.map(function(k){return '<button class="toggle'+(off[k]?' off':'')+'" data-act="skill" data-v="'+esc(k)+'">'+esc(k)+'</button>';}).join('')+(t.skills.length?'':'<span class="hint">No skills listed for '+esc(t.absentee)+' — everyone ranks by availability.</span>')+'</div>';
+  h+='<div class="lbl">Best matches</div>';
+  var good=ranked.filter(function(c){return c.matched.length>0||!needed.length;});
+  var list=showAll?ranked:good.slice(0,6);
+  if(!ranked.length)return h+'<div class="empty"><b>No one is available</b><span>Everyone else is on leave that day.</span></div></div></section>';
+  if(!list.length)h+='<div class="empty" style="padding:14px"><b>No skill matches</b><span>Try loosening a skill above, or show everyone.</span></div>';
+  h+='<div class="cands">';
+  list.forEach(function(c,i){
+    var best=i===0&&!c.covering&&(c.matched.length>0||!needed.length);
+    var pct=needed.length?Math.round(c.matched.length/needed.length*100):100;
+    var avail=c.covering?'<span class="pill clash">Already covering that day</span>':!c.deployed?'<span class="pill free">Free that day</span>':c.clash?'<span class="pill clash">On '+esc(c.code)+' — same shift</span>':'<span class="pill busy">On '+esc(c.code)+' that day</span>';
+    var isCur=t.replacement===c.name;
+    h+='<div class="cand'+(best?' best':'')+'"><div class="rk">'+(i+1)+'</div><div class="nm">'+esc(c.name)+(best?'<span class="pill best">Best fit</span>':'')+'</div><div class="sc"><b>'+c.matched.length+'</b>/'+needed.length+' skills<div class="meter"><i style="width:'+pct+'%"></i></div></div>';
+    h+='<div class="row2"><div style="display:flex;flex-direction:column;align-items:flex-start;gap:5px">'+avail+tagList(c.skills,c.matched)+'</div>';
+    h+='<button class="btn sm'+(best?' primary':'')+'" data-act="assign" data-name="'+esc(c.name)+'"'+(canAssign(t)&&!isCur?'':' disabled')+'>'+(isCur?'Pending':'Assign as replacement')+'</button></div></div>';
+  });
+  h+='</div>';
+  var rest=ranked.length-list.length;
+  if(showAll)h+='<button class="more" data-act="more">Show top matches only</button>';
+  else if(rest>0)h+='<button class="more" data-act="more">Show '+rest+' more (fewer or no matching skills)</button>';
+  return h+'</div></section>';
+}
+function renderPending(){
+  var list=state.tasks.filter(function(t){return t.approval==='pending'&&t.status!=='done';});
+  var h='<section class="panel"><div class="panel-h"><h2>Pending approvals</h2><span class="count">'+list.length+'</span>'+(role!==LEAD&&list.length?'<span class="right hint">Team lead approves</span>':'')+'</div><div class="appr-list">';
+  if(!list.length)return h+'<div class="empty" style="padding:18px 10px">'+ICON.inbox+'<b>You’re all caught up</b><span>No approvals waiting right now.</span></div></div></section>';
+  list.forEach(function(t){
+    var c=rankFor(state,t,t.skills).filter(function(x){return x.name===t.replacement;})[0];
+    var meta=c?(c.matched.length+'/'+t.skills.length+' skills · '+(c.deployed?'on '+esc(c.code)+' that day':'free that day')):'';
+    h+='<div class="appr"><div class="l1"><span class="badge '+t.priority+'">'+t.priority+'</span><b>'+esc(t.replacement)+'</b><span class="hint">covers '+esc(t.absentee)+'</span></div><div class="l2">'+fmt(t.date)+' · '+esc(t.shift)+' · '+meta+'</div><div class="acts"><span class="owner">'+av(t.owner)+'Proposed by '+esc(t.owner||'—')+'</span><button class="btn sm ghost" data-act="back" data-id="'+t.id+'"'+(role===LEAD?'':' disabled')+'>Send back</button><button class="btn sm primary" data-act="approve" data-id="'+t.id+'"'+(role===LEAD?'':' disabled title="Switch to Team lead to approve"')+'>Approve</button></div></div>';
+  });
+  return h+'</div></section>';
+}
+function renderModal(){
+  var names=state.staff.map(function(s){return '<option'+(s.name===modal.staff?' selected':'')+'>'+esc(s.name)+'</option>';}).join('');
+  var dates=state.dates.map(function(d){return '<option value="'+d+'"'+(d===modal.date?' selected':'')+'>'+fmt(d)+'</option>';}).join('');
+  var s=findStaff(state,modal.staff),code=s?s.sched[modal.date]:'';
+  var sh=isWorking(code)||isAbsent(code)?shiftOf(code):'Full day';var pr=autoPriority(modal.date);
+  return '<div class="modal-bg" id="modal-bg"><div class="modal" role="dialog" aria-label="Report absence"><h3>Who’s out?</h3><p>I’ll add a to-do and line up replacements straight away.</p>'+
+  '<div class="field"><label for="m-staff">Staff member</label><select id="m-staff">'+names+'</select></div>'+
+  '<div class="field"><label for="m-date">Date</label><select id="m-date">'+dates+'</select></div>'+
+  '<div class="field"><label for="m-shift">Shift to cover</label><select id="m-shift">'+SHIFT_OPTS.map(function(o){return '<option'+(o===sh?' selected':'')+'>'+o+'</option>';}).join('')+'</select><span class="hint" id="m-hint">'+(s?esc(modal.staff.split(' ')[0])+' is rostered '+esc(code||'nothing')+' on '+fmt(modal.date)+'.':'')+'</span></div>'+
+  '<div class="field"><label for="m-prio">Priority</label><select id="m-prio">'+['High','Medium','Low'].map(function(o){return '<option'+(o===pr?' selected':'')+'>'+o+'</option>';}).join('')+'</select></div>'+
+  '<div class="acts"><button class="btn ghost" data-act="closemodal">Cancel</button><button class="btn primary" data-act="savereport">Add to To do</button></div></div></div>';
+}
+var toastT=null;
+function toast(msg){var el=document.getElementById('toast');if(!el||!msg)return;el.textContent=msg;el.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){el.classList.remove('show');},3400);}
+function setLive(s){var el=document.getElementById('live');if(!el)return;if(s==='saving'){el.className='live saving';el.innerHTML='<span class="dot"></span>Saving…';}else{el.className='live on';el.innerHTML='<span class="dot"></span>Live — everyone sees changes instantly';}}
+
+render();
+var pending=sess.get('cf_toast');if(pending){sess.set('cf_toast',null);setTimeout(function(){toast(pending);},150);}
+})();
+</script></body></html>
