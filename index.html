@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Singapore Air Quality</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: 12-column dark dashboard. Summary (overall PSI ring) beside the regional map, then trend + wind, then region tiles and the category key. */
+:root{
+  --bg:#0E1114;
+  --card:#161A1F;
+  --inset:#11151A;
+  --line:#252B33;
+  --ink:#E9EDF1;
+  --muted:#8C96A1;
+  --accent:#F0A25A;
+  --rise:#E8705F; --fall:#4FB3A4;
+  --uvhigh:#EE9A3E; --good:#4CB97E; --moderate:#E5C04B; --unhealthy:#E8705F; --vunhealthy:#A57BE0; --hazardous:#D84F7C;
+  --font-body:"Manrope","Segoe UI",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+h1,h2,h3{margin:0;font-weight:600;letter-spacing:-.01em;text-wrap:balance}
+.num{font-variant-numeric:tabular-nums}
+.mono{font-family:var(--font-mono)}
+.wrap{max-width:1280px;margin:0 auto;padding:0 24px}
+@media (max-width:600px){.wrap{padding:0 14px}}
+
+header{display:flex;align-items:center;gap:16px;flex-wrap:wrap;padding:24px 0 18px}
+header h1{font-size:24px}
+header .sub{color:var(--muted);font-size:13.5px}
+.status{margin-left:auto;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.chip{display:inline-flex;align-items:center;gap:8px;padding:5px 12px;border-radius:999px;border:1px solid var(--line);background:var(--card);color:var(--ink);font-weight:500}
+.chip i{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.chip.live i{background:var(--good);box-shadow:0 0 0 4px color-mix(in srgb,var(--good) 22%,transparent)}
+.chip.saved i{background:var(--moderate)}
+.chip.err i{background:var(--unhealthy)}
+button{font:inherit}
+.btn{border:1px solid var(--line);background:var(--card);color:var(--ink);border-radius:10px;padding:6px 14px;cursor:pointer;font-weight:500;font-size:13px}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn:focus-visible,.region:focus-visible,.tile:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.notice{display:none;margin:0 0 18px;padding:14px 18px;border-radius:12px;border:1px solid color-mix(in srgb,var(--moderate) 40%,var(--line));background:color-mix(in srgb,var(--moderate) 8%,var(--card));font-size:14px}
+.notice.show{display:block}
+
+.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:18px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:22px;min-width:0}
+.span-4{grid-column:span 4}.span-5{grid-column:span 5}.span-7{grid-column:span 7}.span-8{grid-column:span 8}.span-12{grid-column:span 12}
+@media (max-width:1000px){.span-4,.span-5,.span-7,.span-8{grid-column:span 12}}
+.card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:16px}
+.card-head h2{font-size:16px}
+.card-head p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.label{font-size:11.5px;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+
+.pill{display:inline-flex;align-items:center;gap:7px;padding:3px 11px 3px 9px;border-radius:999px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+
+/* gauge */
+.gauge-wrap{display:flex;flex-direction:column;align-items:center;gap:14px}
+.gauge{width:100%;max-width:300px;height:auto;display:block}
+.gauge-meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;width:100%}
+.mini{background:var(--inset);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+.mini .v{font-family:var(--font-mono);font-size:18px;margin-top:2px}
+.advice{color:var(--muted);font-size:14px;text-align:center;max-width:36ch;margin:0}
+
+/* map */
+.map-svg{width:100%;height:auto;display:block;background:var(--inset);border:1px solid var(--line);border-radius:12px}
+.region{cursor:pointer}
+.region:focus{outline:none}
+
+/* chart */
+.chart{width:100%;height:auto;display:block}
+.chart text{font-family:var(--font-mono);font-size:11px;fill:var(--muted)}
+.chart .bar{transition:opacity .15s}
+.chart .bar:hover{opacity:.75}
+.chart-foot{display:flex;gap:22px;flex-wrap:wrap;margin-top:12px;font-size:13px;color:var(--muted)}
+.chart-foot b{color:var(--ink);font-family:var(--font-mono);font-weight:500}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.empty{display:grid;place-items:center;text-align:center;min-height:220px;color:var(--muted);font-size:14px;padding:20px;background:var(--inset);border:1px dashed var(--line);border-radius:12px}
+
+/* wind */
+.wind{display:grid;grid-template-columns:220px 1fr;gap:22px;align-items:center}
+@media (max-width:520px){.wind{grid-template-columns:1fr;justify-items:center}}
+.compass{width:100%;max-width:220px;height:auto}
+.wind-stats{display:grid;gap:12px;width:100%}
+
+/* tiles */
+.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+@media (max-width:1000px){.tiles{grid-template-columns:repeat(3,1fr)}}
+@media (max-width:560px){.tiles{grid-template-columns:1fr 1fr}}
+.tile{text-align:left;color:inherit;background:var(--inset);border:1px solid var(--line);border-top:4px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;display:flex;flex-direction:column;gap:6px}
+.tile:hover{border-color:var(--muted)}
+.tile.sel{border-color:var(--accent)}
+.tile .pill{align-self:flex-start}
+.tile .v{font-family:var(--font-mono);font-size:32px;line-height:1.1}
+.tile .s{font-size:12.5px;color:var(--muted)}
+
+/* legend */
+.legend{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.legend.stack{grid-template-columns:1fr;gap:10px}
+.legend.stack .key{padding:10px 14px;display:grid;grid-template-columns:110px 60px 1fr;gap:10px;align-items:baseline}
+.legend.stack .key p{margin:0}
+@media (max-width:520px){.legend.stack .key{grid-template-columns:1fr 1fr}.legend.stack .key p{grid-column:1/-1}}
+.divider{grid-column:span 12;display:flex;align-items:baseline;gap:14px;margin-top:14px}
+.divider h2{font-size:20px}
+.divider p{margin:0;color:var(--muted);font-size:13.5px}
+@media (max-width:1000px){.legend{grid-template-columns:1fr 1fr}}
+.key{border-radius:12px;padding:14px 16px;background:var(--inset);border:1px solid var(--line);border-left:4px solid}
+.key b{display:block;font-size:14px}
+.key .r{font-family:var(--font-mono);font-size:13px;color:var(--muted)}
+.key p{margin:6px 0 0;font-size:13px;color:var(--muted)}
+
+footer{padding:26px 0 44px;color:var(--muted);font-size:13px}
+footer p{margin:0 0 6px;max-width:95ch}
+footer a{color:var(--ink)}
+.skeleton{color:var(--muted)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Singapore Air Quality</h1>
+      <div class="sub">24-hour PSI, UV index and wind from the National Environment Agency</div>
+    </div>
+    <div class="status">
+      <span class="chip" id="chip"><i></i><span id="chipText">Connecting to data.gov.sg…</span></span>
+      <span id="stamp" class="num"></span>
+      <button class="btn" id="refresh" type="button">Refresh</button>
+    </div>
+  </header>
+
+  <div class="notice" id="notice" role="status"></div>
+
+  <main class="grid">
+    <section class="card span-4" aria-labelledby="hOverall">
+      <div class="card-head"><div><h2 id="hOverall">Overall PSI</h2><p>Highest 24-hr PSI of the five regions</p></div></div>
+      <div class="gauge-wrap" id="gauge"><div class="empty" style="width:100%">Loading NEA reading…</div></div>
+    </section>
+
+    <section class="card span-8" aria-labelledby="hMap">
+      <div class="card-head">
+        <div><h2 id="hMap">24-hr PSI by region</h2><p>Select a region to chart its changes. Boundaries are approximate.</p></div>
+        <span id="mapTime" class="label"></span>
+      </div>
+      <svg class="map-svg" id="map" viewBox="0 0 814 520" role="group" aria-label="Map of Singapore regions with 24-hour PSI"></svg>
+    </section>
+
+    <section class="card span-7" aria-labelledby="hChart">
+      <div class="card-head">
+        <div><h2 id="hChart">Hourly PSI change</h2><p id="chartSub">Change in 24-hr PSI from one hourly reading to the next, past 24 hours</p></div>
+        <div class="seg" id="seg" role="group" aria-label="Series"></div>
+      </div>
+      <div id="chart"><div class="empty">Loading history…</div></div>
+      <div class="chart-foot" id="chartFoot"></div>
+    </section>
+
+    <section class="card span-5" aria-labelledby="hWind">
+      <div class="card-head"><div><h2 id="hWind">Wind</h2><p>Islandwide average of NEA weather stations</p></div><span id="windTime" class="label"></span></div>
+      <div id="wind"><div class="empty">Loading wind readings…</div></div>
+    </section>
+
+    <section class="card span-12" aria-labelledby="hRegions">
+      <div class="card-head"><div><h2 id="hRegions">Regions</h2><p>24-hr PSI with 24-hr PM2.5 and PM10 concentrations</p></div></div>
+      <div class="tiles" id="tiles"></div>
+    </section>
+
+    <div class="divider" id="uv"><h2>UV index</h2><p>NEA updates UV hourly between 7am and 7pm</p></div>
+
+    <section class="card span-4" aria-labelledby="hUv">
+      <div class="card-head"><div><h2 id="hUv">Current UV index</h2><p>Islandwide, averaged over the preceding hour</p></div></div>
+      <div class="gauge-wrap" id="uvGauge"><div class="empty" style="width:100%">Loading NEA UV reading…</div></div>
+    </section>
+
+    <section class="card span-8" aria-labelledby="hUvMap">
+      <div class="card-head">
+        <div><h2 id="hUvMap">UV index across Singapore</h2><p>NEA publishes one UV reading for the whole island, so every region shares it.</p></div>
+        <span id="uvTime" class="label"></span>
+      </div>
+      <svg class="map-svg" id="uvMap" viewBox="0 0 814 520" role="img" aria-label="Map of Singapore coloured by the islandwide UV index"></svg>
+    </section>
+
+    <section class="card span-7" aria-labelledby="hUvChart">
+      <div class="card-head"><div><h2 id="hUvChart">UV index by hour</h2><p id="uvChartSub">Hourly readings published by NEA today</p></div></div>
+      <div id="uvChart"><div class="empty">Loading UV readings…</div></div>
+      <div class="chart-foot" id="uvFoot"></div>
+    </section>
+
+    <section class="card span-5" aria-labelledby="hUvKey">
+      <div class="card-head"><div><h2 id="hUvKey">UV categories</h2><p>Sun protection guidance by UV level</p></div></div>
+      <div class="legend stack" id="uvLegend"></div>
+    </section>
+
+    <div class="divider"><h2>Reference</h2><p>How PSI readings are grouped</p></div>
+
+    <section class="card span-12" aria-labelledby="hKey">
+      <div class="card-head"><div><h2 id="hKey">Air quality categories</h2><p>NEA PSI bands and general guidance for healthy people</p></div></div>
+      <div class="legend" id="legend"></div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Source: National Environment Agency, via <a href="https://data.gov.sg">data.gov.sg</a> real-time APIs (PSI, UV index, wind speed, wind direction). Readings are shown exactly as published; nothing is estimated or filled in.</p>
+    <p>PSI here is NEA's 24-hour PSI, updated hourly. UV index is a single islandwide value, updated hourly from 7am to 7pm. The page checks for new data every 5 minutes while open.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+"use strict";
+const $=id=>document.getElementById(id);
+
+// ---------- endpoints (v2 first, v1 as fallback) ----------
+const V2="https://api-open.data.gov.sg/v2/real-time/api";
+const V1="https://api.data.gov.sg/v1/environment";
+const REFRESH_MS=5*60*1000;
+
+// Real NEA reading retrieved when this file was built. Shown only when live requests are blocked, and labelled as such.
+const SAVED_READING={
+  timestamp:"2026-11-01T06:00:00+08:00", updated:"2026-11-01T06:00:55+08:00",
+  readings:{
+    psi_twenty_four_hourly:{west:85,east:67,central:71,south:69,north:68},
+    pm25_twenty_four_hourly:{west:42,east:26,central:30,south:28,north:27},
+    pm10_twenty_four_hourly:{west:61,east:47,central:47,south:38,north:46}
+  }
+};
+
+// ---------- categories ----------
+const BANDS=[
+  {lo:0,  hi:50, key:"good",       label:"Good",           range:"0–50",    tip:"Normal activities."},
+  {lo:51, hi:100,key:"moderate",   label:"Moderate",       range:"51–100",  tip:"Normal activities."},
+  {lo:101,hi:200,key:"unhealthy",  label:"Unhealthy",      range:"101–200", tip:"Reduce prolonged or strenuous outdoor exertion."},
+  {lo:201,hi:300,key:"vunhealthy", label:"Very unhealthy", range:"201–300", tip:"Avoid prolonged or strenuous outdoor exertion."},
+  {lo:301,hi:500,key:"hazardous",  label:"Hazardous",      range:"301+",    tip:"Minimise outdoor activity."}
+];
+const band=v=>BANDS.find(b=>v<=b.hi)||BANDS[4];
+const col=k=>`var(--${k})`;
+const pill=v=>{const b=band(v);return `<span class="pill" style="color:${col(b.key)};background:color-mix(in srgb,${col(b.key)} 15%,transparent)">${b.label}</span>`};
+const REGIONS=["north","west","central","east","south"];
+const NAMES={north:"North",west:"West",central:"Central",east:"East",south:"South"};
+
+// ---------- time helpers ----------
+const SGT="Asia/Singapore";
+const hhmm=iso=>new Date(iso).toLocaleTimeString("en-SG",{hour:"2-digit",minute:"2-digit",hour12:false,timeZone:SGT});
+const hourLbl=iso=>new Date(iso).toLocaleTimeString("en-SG",{hour:"numeric",hour12:true,timeZone:SGT}).replace(" ","").toLowerCase();
+const dayStr=d=>new Intl.DateTimeFormat("en-CA",{timeZone:SGT,year:"numeric",month:"2-digit",day:"2-digit"}).format(d);
+const dateLbl=iso=>new Date(iso).toLocaleDateString("en-SG",{day:"numeric",month:"short",timeZone:SGT});
+
+// ---------- fetching ----------
+async function getJSON(url){
+  const c=new AbortController(); const t=setTimeout(()=>c.abort(),10000);
+  try{const r=await fetch(url,{signal:c.signal,headers:{accept:"application/json"}}); if(!r.ok) throw new Error("HTTP "+r.status); return await r.json();}
+  finally{clearTimeout(t)}
+}
+async function firstOk(urls,parse){
+  let last;
+  for(const u of urls){ try{ return parse(await getJSON(u)); }catch(e){ last=e; } }
+  throw last||new Error("No data");
+}
+// PSI items -> [{timestamp, updated, readings}]
+function psiItems(j){
+  const items=(j.data&&j.data.items)||j.items||[];
+  const out=items.filter(i=>i.readings&&i.readings.psi_twenty_four_hourly).map(i=>({timestamp:i.timestamp,updated:i.updatedTimestamp||i.update_timestamp||i.timestamp,readings:i.readings}));
+  if(!out.length) throw new Error("Empty PSI response");
+  return out;
+}
+const fetchLatestPsi=()=>firstOk([`${V2}/psi`,`${V1}/psi`],j=>psiItems(j).sort((a,b)=>a.timestamp<b.timestamp?-1:1).pop());
+async function fetchPsiHistory(){
+  const now=new Date(), y=new Date(now.getTime()-864e5);
+  const days=[dayStr(y),dayStr(now)];
+  const lists=await Promise.all(days.map(dt=>firstOk([`${V2}/psi?date=${dt}`,`${V1}/psi?date=${dt}`],psiItems).catch(()=>[])));
+  const seen=new Map();
+  lists.flat().forEach(i=>seen.set(i.timestamp,i));
+  const all=[...seen.values()].sort((a,b)=>a.timestamp<b.timestamp?-1:1);
+  if(all.length<2) throw new Error("Not enough history");
+  return all.slice(-25); // 25 readings -> 24 hourly changes
+}
+// Station readings -> {timestamp, unit, values:[{id,value}]}
+function stationReadings(j){
+  if(j.data&&j.data.readings){
+    const r=j.data.readings[j.data.readings.length-1];
+    return {timestamp:r.timestamp, unit:j.data.readingUnit||"", values:r.data.map(d=>({id:d.stationId,value:d.value}))};
+  }
+  if(j.items&&j.items[0]){
+    const it=j.items[0];
+    return {timestamp:it.timestamp, unit:(j.metadata&&j.metadata.reading_unit)||"", values:it.readings.map(d=>({id:d.station_id,value:d.value}))};
+  }
+  throw new Error("Unexpected wind response");
+}
+async function fetchWind(){
+  const [spd,dir]=await Promise.all([
+    firstOk([`${V2}/wind-speed`,`${V1}/wind-speed`],stationReadings),
+    firstOk([`${V2}/wind-direction`,`${V1}/wind-direction`],stationReadings)
+  ]);
+  const dirById=new Map(dir.values.map(v=>[v.id,v.value]));
+  const pairs=spd.values.filter(v=>dirById.has(v.id)&&v.value!=null).map(v=>({s:v.value,d:dirById.get(v.id)}));
+  if(!pairs.length) throw new Error("No matching stations");
+  // vector average; direction is where the wind comes FROM (meteorological)
+  let u=0,w=0; pairs.forEach(p=>{const r=p.d*Math.PI/180;u+=-p.s*Math.sin(r);w+=-p.s*Math.cos(r);});
+  u/=pairs.length; w/=pairs.length;
+  const from=(Math.atan2(-u,-w)*180/Math.PI+360)%360;
+  const meanSpeed=pairs.reduce((a,p)=>a+p.s,0)/pairs.length;
+  const maxSpeed=Math.max(...pairs.map(p=>p.s));
+  const knots=/knot/i.test(spd.unit)||!spd.unit;
+  return {timestamp:spd.timestamp, from, meanKn:knots?meanSpeed:meanSpeed/1.852, maxKn:knots?maxSpeed:maxSpeed/1.852, stations:pairs.length};
+}
+
+// ---------- state ----------
+let latest=null, history=null, wind=null, mode="saved", series="overall";
+const overallOf=r=>Math.max(...REGIONS.map(k=>r.psi_twenty_four_hourly[k]).filter(v=>v!=null));
+
+// ---------- gauge ----------
+function posOf(v){const i=BANDS.indexOf(band(v)), b=BANDS[i]; const f=Math.min(1,Math.max(0,(v-b.lo)/(b.hi-b.lo))); return (i+f)/5;}
+function arc(cx,cy,r,a0,a1){
+  const p=a=>[cx+r*Math.cos((a-90)*Math.PI/180),cy+r*Math.sin((a-90)*Math.PI/180)];
+  const [x0,y0]=p(a0),[x1,y1]=p(a1); const large=a1-a0>180?1:0;
+  return `M${x0.toFixed(2)},${y0.toFixed(2)}A${r},${r} 0 ${large} 1 ${x1.toFixed(2)},${y1.toFixed(2)}`;
+}
+function drawGauge(){
+  const r=latest.readings, v=overallOf(r), b=band(v);
+  const worst=REGIONS.filter(k=>r.psi_twenty_four_hourly[k]===v).map(k=>NAMES[k]).join(", ");
+  const vals=REGIONS.map(k=>r.psi_twenty_four_hourly[k]);
+  const START=-135, SWEEP=270, gap=2.2;
+  let s=`<svg class="gauge" viewBox="0 0 240 228" role="img" aria-label="Overall PSI ${v}, ${b.label}">`;
+  BANDS.forEach((x,i)=>{
+    const a0=START+SWEEP*i/5+gap/2, a1=START+SWEEP*(i+1)/5-gap/2;
+    s+=`<path d="${arc(120,120,96,a0,a1)}" fill="none" stroke="${col(x.key)}" stroke-width="14" stroke-linecap="butt" opacity="${x===b?1:.22}"/>`;
+  });
+  const av=START+SWEEP*posOf(v);
+  s+=`<path d="${arc(120,120,76,START,Math.max(START+.5,av))}" fill="none" stroke="${col(b.key)}" stroke-width="5" stroke-linecap="round" opacity=".55"/>`;
+  const mx=120+96*Math.cos((av-90)*Math.PI/180), my=120+96*Math.sin((av-90)*Math.PI/180);
+  s+=`<circle cx="${mx}" cy="${my}" r="10" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/>`;
+  s+=`<text x="120" y="122" text-anchor="middle" font-family="var(--font-mono)" font-size="58" fill="var(--ink)">${v}</text>`;
+  s+=`<text x="120" y="150" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="600" fill="${col(b.key)}">${b.label}</text>`;
+  s+=`<text x="40" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">0</text>`;
+  s+=`<text x="200" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">300+</text>`;
+  s+=`</svg>`;
+  $("gauge").innerHTML=`${s}
+    <p class="advice">${b.tip} Highest in ${worst}.</p>
+    <div class="gauge-meta">
+      <div class="mini"><div class="label">Regional range</div><div class="v num">${Math.min(...vals)}–${Math.max(...vals)}</div></div>
+      <div class="mini"><div class="label">Reading time</div><div class="v num">${hhmm(latest.timestamp)}</div></div>
+    </div>`;
+}
+
+// ---------- map (stylised outline) ----------
+const pathOf=p=>"M"+p.map(q=>q.join(",")).join("L")+"Z";
+const ISLAND=[[87,375],[62,308],[117,198],[222,76],[294,71],[307,76],[392,35],[442,55],[507,88],[552,120],[592,133],[629,183],[669,166],[747,233],[742,280],[697,283],[572,315],[462,330],[447,363],[414,377],[370,377],[294,358],[237,335],[170,350],[120,363]];
+const SENTOSA=[[377,393],[387,406],[447,403],[463,393],[427,386]];
+const AREA={
+  west:   {poly:[[0,0],[294,0],[294,520],[0,520]],         box:[118,205]},
+  north:  {poly:[[294,0],[552,0],[552,176],[294,176]],     box:[358,70]},
+  central:{poly:[[294,176],[552,176],[552,306],[294,306]], box:[358,198]},
+  south:  {poly:[[294,306],[552,306],[552,520],[294,520]], box:[358,428]},
+  east:   {poly:[[552,0],[814,0],[814,520],[552,520]],     box:[580,205]}
+};
+function drawMap(){
+  const R=latest.readings.psi_twenty_four_hourly;
+  let s=`<defs><clipPath id="land"><path d="${pathOf(ISLAND)}"/><path d="${pathOf(SENTOSA)}"/></clipPath></defs>`;
+  s+=`<text x="407" y="22" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">JOHOR STRAIT</text>`;
+  s+=`<text x="18" y="505" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">SINGAPORE STRAIT</text>`;
+  s+=`<g clip-path="url(#land)">`;
+  REGIONS.forEach(k=>{const b=band(R[k]);
+    s+=`<path class="region" data-id="${k}" d="${pathOf(AREA[k].poly)}" style="fill:color-mix(in srgb,${col(b.key)} ${series===k?55:34}%,#11151A)" stroke="#11151A" stroke-width="3"/>`;});
+  s+=`</g>`;
+  s+=`<circle cx="414" cy="347" r="4" fill="var(--muted)"/><line x1="414" y1="352" x2="414" y2="426" stroke="var(--muted)" stroke-dasharray="2 4"/>`;
+  REGIONS.forEach(k=>{
+    const v=R[k], b=band(v), [x,y]=AREA[k].box, sel=series===k;
+    s+=`<g class="region" data-id="${k}" tabindex="0" role="button" aria-pressed="${sel}" aria-label="${NAMES[k]}, 24-hour PSI ${v}, ${b.label}">`;
+    if(sel) s+=`<rect x="${x-6}" y="${y-6}" width="112" height="82" rx="12" fill="none" stroke="var(--accent)" stroke-width="2"/>`;
+    s+=`<rect x="${x}" y="${y}" width="100" height="70" rx="8" fill="#161A1F" stroke="${col(b.key)}" stroke-width="2"/>`;
+    s+=`<text x="${x+50}" y="${y+18}" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" letter-spacing="1.5" fill="var(--muted)">${NAMES[k].toUpperCase()}</text>`;
+    s+=`<text x="${x+50}" y="${y+47}" text-anchor="middle" font-family="var(--font-mono)" font-size="28" fill="var(--ink)">${v}</text>`;
+    s+=`<text x="${x+50}" y="${y+63}" text-anchor="middle" font-family="var(--font-body)" font-size="11" font-weight="600" fill="${col(b.key)}">${b.label}</text>`;
+    s+=`</g>`;
+  });
+  const m=$("map"); m.innerHTML=s;
+  m.querySelectorAll(".region").forEach(el=>{
+    el.addEventListener("click",()=>setSeries(el.dataset.id));
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();setSeries(el.dataset.id)}});
+  });
+  $("mapTime").textContent=`${dateLbl(latest.timestamp)}, ${hhmm(latest.timestamp)} SGT`;
+}
+
+// ---------- tiles + legend ----------
+function drawTiles(){
+  const r=latest.readings;
+  $("tiles").innerHTML=REGIONS.map(k=>{
+    const v=r.psi_twenty_four_hourly[k], b=band(v);
+    const pm25=r.pm25_twenty_four_hourly?r.pm25_twenty_four_hourly[k]:null, pm10=r.pm10_twenty_four_hourly?r.pm10_twenty_four_hourly[k]:null;
+    return `<button class="tile${series===k?" sel":""}" data-id="${k}" style="border-top-color:${col(b.key)}" aria-pressed="${series===k}">
+      <span class="label">${NAMES[k]}</span><span class="v num">${v}</span>${pill(v)}
+      <span class="s num">PM2.5 ${pm25??"—"} · PM10 ${pm10??"—"} µg/m³</span></button>`;
+  }).join("");
+  $("tiles").querySelectorAll(".tile").forEach(t=>t.addEventListener("click",()=>setSeries(t.dataset.id)));
+}
+function drawLegend(){
+  $("legend").innerHTML=BANDS.map(b=>`<div class="key" style="border-left-color:${col(b.key)}"><b style="color:${col(b.key)}">${b.label}</b><span class="r">${b.range}</span><p>${b.tip}</p></div>`).join("");
+}
+
+// ---------- chart ----------
+function drawSeg(){
+  const opts=[["overall","Overall"],...REGIONS.map(k=>[k,NAMES[k]])];
+  $("seg").innerHTML=opts.map(([k,l])=>`<button class="btn" type="button" data-k="${k}" aria-pressed="${series===k}">${l}</button>`).join("");
+  $("seg").querySelectorAll("button").forEach(b=>b.addEventListener("click",()=>setSeries(b.dataset.k)));
+}
+function drawChart(){
+  if(!history){
+    $("chart").innerHTML=`<div class="empty">${mode==="live"?"NEA's hourly history could not be loaded just now. Try Refresh.":"PSI history needs a live connection to data.gov.sg. Open this file in a browser tab to see the past 24 hours."}</div>`;
+    $("chartFoot").innerHTML=""; return;
+  }
+  const val=i=>series==="overall"?overallOf(i.readings):i.readings.psi_twenty_four_hourly[series];
+  const pts=history.map(i=>({t:i.timestamp,v:val(i)})).filter(p=>p.v!=null);
+  const ch=pts.slice(1).map((p,i)=>({t:p.t,v:p.v,d:p.v-pts[i].v}));
+  if(!ch.length){$("chart").innerHTML=`<div class="empty">Not enough readings yet.</div>`;return;}
+  const W=640,H=250,pl=36,pr=8,pt=14,pb=28;
+  const m=Math.max(3,...ch.map(c=>Math.abs(c.d)));
+  const step=m<=5?1:m<=10?2:m<=25?5:10, lim=Math.ceil(m/step)*step;
+  const y=v=>pt+(H-pt-pb)*(lim-v)/(2*lim);
+  const bw=(W-pl-pr)/ch.length;
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Hourly change in ${series==="overall"?"overall":NAMES[series]} PSI over the past ${ch.length} hours">`;
+  for(let v=-lim; v<=lim; v+=step*(lim/step>4?2:1)){
+    s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v===0?'stroke-width="1.5"':'stroke-dasharray="2 4"'}/>`;
+    s+=`<text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${v>0?"+":""}${v}</text>`;
+  }
+  ch.forEach((c,i)=>{
+    const x=pl+i*bw+bw*0.18, w=bw*0.64;
+    const h=Math.abs(y(c.d)-y(0)), top=c.d>=0?y(c.d):y(0);
+    const fill=c.d>0?"var(--rise)":c.d<0?"var(--fall)":"var(--muted)";
+    s+=`<rect class="bar" x="${x.toFixed(1)}" y="${top.toFixed(1)}" width="${w.toFixed(1)}" height="${Math.max(c.d===0?1.5:0,h).toFixed(1)}" rx="2" fill="${fill}"><title>${hhmm(c.t)} SGT: PSI ${c.v} (${c.d>0?"+":""}${c.d})</title></rect>`;
+    if(i%4===0||i===ch.length-1) s+=`<text x="${(x+w/2).toFixed(1)}" y="${H-8}" text-anchor="middle">${hourLbl(c.t)}</text>`;
+  });
+  s+=`</svg>`;
+  $("chart").innerHTML=s;
+  const net=pts[pts.length-1].v-pts[0].v;
+  const ups=ch.filter(c=>c.d>0).length, downs=ch.filter(c=>c.d<0).length;
+  $("chartFoot").innerHTML=`<span>Net change <b>${net>0?"+":""}${net}</b> (${pts[0].v} → ${pts[pts.length-1].v})</span>
+    <span><b>${ups}</b> hours rising · <b>${downs}</b> falling</span>
+    <span><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--rise)"></i> rise &nbsp;<i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:var(--fall)"></i> fall</span>`;
+}
+
+// ---------- wind ----------
+const COMPASS=["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"];
+const compass=d=>COMPASS[Math.round(d/22.5)%16];
+function drawWind(){
+  if(!wind){
+    $("wind").innerHTML=`<div class="empty">${mode==="live"?"NEA wind readings could not be loaded just now. Try Refresh.":"Wind readings need a live connection to data.gov.sg. Open this file in a browser tab to see current wind."}</div>`;
+    $("windTime").textContent=""; return;
+  }
+  const to=(wind.from+180)%360;
+  let s=`<svg class="compass" viewBox="0 0 220 220" role="img" aria-label="Wind from ${compass(wind.from)} at ${(wind.meanKn*1.852).toFixed(0)} km/h">
+    <circle cx="110" cy="110" r="96" fill="var(--inset)" stroke="var(--line)" stroke-width="1.5"/>
+    <circle cx="110" cy="110" r="64" fill="none" stroke="var(--line)" stroke-dasharray="2 5"/>`;
+  for(let a=0;a<360;a+=15){const r1=a%90===0?82:a%45===0?86:90;const rad=(a-90)*Math.PI/180;
+    s+=`<line x1="${110+r1*Math.cos(rad)}" y1="${110+r1*Math.sin(rad)}" x2="${110+96*Math.cos(rad)}" y2="${110+96*Math.sin(rad)}" stroke="var(--muted)" stroke-width="${a%90===0?2:1}" opacity=".7"/>`;}
+  [["N",0],["E",90],["S",180],["W",270]].forEach(([l,a])=>{const rad=(a-90)*Math.PI/180;
+    s+=`<text x="${110+70*Math.cos(rad)}" y="${110+70*Math.sin(rad)+4.5}" text-anchor="middle" font-family="var(--font-mono)" font-size="13" font-weight="500" fill="${l==="N"?"var(--ink)":"var(--muted)"}">${l}</text>`;});
+  s+=`<g transform="rotate(${to} 110 110)">
+      <line x1="110" y1="168" x2="110" y2="62" stroke="var(--accent)" stroke-width="4" stroke-linecap="round"/>
+      <path d="M110 46 L122 68 L110 62 L98 68Z" fill="var(--accent)"/>
+      <circle cx="110" cy="172" r="5" fill="none" stroke="var(--accent)" stroke-width="2.5"/></g>
+    <circle cx="110" cy="110" r="4" fill="var(--ink)"/></svg>`;
+  const kmh=wind.meanKn*1.852, gust=wind.maxKn*1.852;
+  $("wind").innerHTML=`<div class="wind">${s}
+    <div class="wind-stats">
+      <div class="mini"><div class="label">Average speed</div><div class="v num">${kmh.toFixed(1)} km/h <span style="color:var(--muted);font-size:13px">· ${wind.meanKn.toFixed(1)} kn</span></div></div>
+      <div class="mini"><div class="label">Direction</div><div class="v num">From ${compass(wind.from)} · ${Math.round(wind.from)}°</div></div>
+      <div class="mini"><div class="label">Highest station</div><div class="v num">${gust.toFixed(1)} km/h</div></div>
+      <div class="mini"><div class="label">Stations reporting</div><div class="v num">${wind.stations}</div></div>
+    </div></div>`;
+  $("windTime").textContent=`${hhmm(wind.timestamp)} SGT`;
+}
+
+
+// ---------- UV index ----------
+const UVB=[
+  {lo:0, hi:3, key:"good",       label:"Low",       range:"0–2",  tip:"Little protection needed."},
+  {lo:3, hi:6, key:"moderate",   label:"Moderate",  range:"3–5",  tip:"Seek shade around midday; wear sunscreen."},
+  {lo:6, hi:8, key:"uvhigh",     label:"High",      range:"6–7",  tip:"Cut sun exposure from 11am to 3pm; hat, sunglasses, SPF 30+."},
+  {lo:8, hi:11,key:"unhealthy",  label:"Very high", range:"8–10", tip:"Take extra care; avoid the midday sun."},
+  {lo:11,hi:16,key:"vunhealthy", label:"Extreme",   range:"11+",  tip:"Avoid being outdoors in the middle of the day."}
+];
+const uvBand=v=>UVB.find(b=>v<b.hi)||UVB[4];
+const uvPos=v=>{const i=UVB.indexOf(uvBand(v)),b=UVB[i];return (i+Math.min(1,Math.max(0,(v-b.lo)/(b.hi-b.lo))))/5;};
+const fmtUv=v=>Number.isInteger(v)?String(v):v.toFixed(1);
+let uv=null;
+function parseUv(j){
+  let rec, entries;
+  if(j.data&&j.data.records&&j.data.records.length){
+    rec=[...j.data.records].sort((a,b)=>a.timestamp<b.timestamp?-1:1).pop();
+    entries=(rec.index||[]).map(e=>({t:e.hour||e.timestamp,v:e.value}));
+    return finishUv(rec.timestamp, rec.updatedTimestamp||rec.timestamp, entries);
+  }
+  if(j.items&&j.items[0]){
+    rec=j.items[0];
+    entries=(rec.index||[]).map(e=>({t:e.timestamp||e.hour,v:e.value}));
+    return finishUv(rec.timestamp, rec.update_timestamp||rec.timestamp, entries);
+  }
+  throw new Error("Unexpected UV response");
+}
+function finishUv(timestamp,updated,entries){
+  entries=entries.filter(e=>e.t&&e.v!=null).sort((a,b)=>a.t<b.t?-1:1);
+  if(!entries.length) throw new Error("No UV readings");
+  return {timestamp,updated,entries,latest:entries[entries.length-1]};
+}
+const fetchUv=()=>firstOk([`${V2}/uv`,`${V1}/uv-index`],parseUv);
+
+function drawUvGauge(){
+  if(!uv){
+    $("uvGauge").innerHTML=`<div class="empty" style="width:100%">${mode==="live"?"NEA's UV reading could not be loaded just now. Try Refresh.":"The UV index needs a live connection to data.gov.sg. Open this file in a browser tab to see it."}</div>`;
+    return;
+  }
+  const v=uv.latest.v, b=uvBand(v), START=-135, SWEEP=270, gap=2.2;
+  const peak=uv.entries.reduce((a,e)=>e.v>a.v?e:a);
+  let s=`<svg class="gauge" viewBox="0 0 240 228" role="img" aria-label="UV index ${fmtUv(v)}, ${b.label}">`;
+  UVB.forEach((x,i)=>{
+    const a0=START+SWEEP*i/5+gap/2, a1=START+SWEEP*(i+1)/5-gap/2;
+    s+=`<path d="${arc(120,120,96,a0,a1)}" fill="none" stroke="${col(x.key)}" stroke-width="14" opacity="${x===b?1:.22}"/>`;
+  });
+  const av=START+SWEEP*uvPos(v);
+  s+=`<path d="${arc(120,120,76,START,Math.max(START+.5,av))}" fill="none" stroke="${col(b.key)}" stroke-width="5" stroke-linecap="round" opacity=".55"/>`;
+  const mx=120+96*Math.cos((av-90)*Math.PI/180), my=120+96*Math.sin((av-90)*Math.PI/180);
+  s+=`<circle cx="${mx}" cy="${my}" r="10" fill="var(--card)" stroke="var(--ink)" stroke-width="3"/>`;
+  s+=`<text x="120" y="122" text-anchor="middle" font-family="var(--font-mono)" font-size="58" fill="var(--ink)">${fmtUv(v)}</text>`;
+  s+=`<text x="120" y="150" text-anchor="middle" font-family="var(--font-body)" font-size="15" font-weight="600" fill="${col(b.key)}">${b.label}</text>`;
+  s+=`<text x="40" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">0</text>`;
+  s+=`<text x="200" y="214" text-anchor="middle" font-family="var(--font-mono)" font-size="11" fill="var(--muted)">11+</text></svg>`;
+  $("uvGauge").innerHTML=`${s}
+    <p class="advice">${b.tip}</p>
+    <div class="gauge-meta">
+      <div class="mini"><div class="label">Today's peak</div><div class="v num">${fmtUv(peak.v)} · ${hhmm(peak.t)}</div></div>
+      <div class="mini"><div class="label">Reading for</div><div class="v num">${hhmm(uv.latest.t)}</div></div>
+    </div>`;
+}
+function drawUvMap(){
+  const has=!!uv, v=has?uv.latest.v:null, b=has?uvBand(v):null;
+  const fill=has?`color-mix(in srgb,${col(b.key)} 42%,#11151A)`:"#1E242B";
+  let s=`<defs><clipPath id="uvland"><path d="${pathOf(ISLAND)}"/><path d="${pathOf(SENTOSA)}"/></clipPath></defs>`;
+  s+=`<text x="407" y="22" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">JOHOR STRAIT</text>`;
+  s+=`<text x="18" y="505" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--muted)">SINGAPORE STRAIT</text>`;
+  s+=`<g clip-path="url(#uvland)">`;
+  REGIONS.forEach(k=>{s+=`<path d="${pathOf(AREA[k].poly)}" style="fill:${fill}" stroke="#11151A" stroke-width="3"/>`;});
+  s+=`</g>`;
+  // faint region names so the layout reads the same as the PSI map
+  REGIONS.filter(k=>k!=="central").forEach(k=>{const [x,y]=AREA[k].box;
+    s+=`<text x="${x+50}" y="${k==="south"?y-50:y+40}" text-anchor="middle" font-family="var(--font-mono)" font-size="11" letter-spacing="2" fill="var(--ink)" opacity=".55">${NAMES[k].toUpperCase()}</text>`;});
+  const [x,y]=AREA.central.box, bx=x-25, w=150;
+  s+=`<rect x="${bx}" y="${y-4}" width="${w}" height="80" rx="8" fill="#161A1F" stroke="${has?col(b.key):"var(--line)"}" stroke-width="2"/>`;
+  s+=`<text x="${bx+w/2}" y="${y+15}" text-anchor="middle" font-family="var(--font-mono)" font-size="10.5" letter-spacing="1.5" fill="var(--muted)">ISLANDWIDE UV</text>`;
+  s+=`<text x="${bx+w/2}" y="${y+48}" text-anchor="middle" font-family="var(--font-mono)" font-size="30" fill="var(--ink)">${has?fmtUv(v):"—"}</text>`;
+  s+=`<text x="${bx+w/2}" y="${y+66}" text-anchor="middle" font-family="var(--font-body)" font-size="11.5" font-weight="600" fill="${has?col(b.key):"var(--muted)"}">${has?b.label:"No live reading"}</text>`;
+  $("uvMap").innerHTML=s;
+  $("uvTime").textContent=has?`${dateLbl(uv.latest.t)}, ${hhmm(uv.latest.t)} SGT`:"";
+}
+function drawUvChart(){
+  if(!uv){
+    $("uvChart").innerHTML=`<div class="empty">${mode==="live"?"NEA's UV readings could not be loaded just now. Try Refresh.":"Hourly UV readings need a live connection to data.gov.sg."}</div>`;
+    $("uvFoot").innerHTML=""; return;
+  }
+  const e=uv.entries, W=640,H=250,pl=36,pr=8,pt=14,pb=28;
+  const top=Math.max(11,Math.ceil(Math.max(...e.map(x=>x.v))));
+  const y=v=>pt+(H-pt-pb)*(1-v/top);
+  const slots=Math.max(e.length,13), bw=(W-pl-pr)/slots;
+  let s=`<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="UV index by hour, ${dateLbl(uv.latest.t)}">`;
+  [0,3,6,8,11].filter(v=>v<=top).forEach(v=>{
+    s+=`<line x1="${pl}" x2="${W-pr}" y1="${y(v)}" y2="${y(v)}" stroke="var(--line)" ${v===0?'stroke-width="1.5"':'stroke-dasharray="2 4"'}/>`;
+    s+=`<text x="${pl-6}" y="${y(v)+4}" text-anchor="end">${v}</text>`;
+  });
+  e.forEach((p,i)=>{
+    const x=pl+i*bw+bw*0.18, w=bw*0.64, b=uvBand(p.v), h=Math.max(p.v===0?1.5:0,y(0)-y(p.v));
+    s+=`<rect class="bar" x="${x.toFixed(1)}" y="${(y(0)-h).toFixed(1)}" width="${w.toFixed(1)}" height="${h.toFixed(1)}" rx="2" fill="${col(b.key)}"><title>${hhmm(p.t)} SGT: UV ${fmtUv(p.v)} (${b.label})</title></rect>`;
+    s+=`<text x="${(x+w/2).toFixed(1)}" y="${H-8}" text-anchor="middle">${hourLbl(p.t)}</text>`;
+  });
+  s+=`</svg>`;
+  $("uvChart").innerHTML=s;
+  $("uvChartSub").textContent=`Hourly readings published by NEA, ${dateLbl(uv.latest.t)}`;
+  const peak=e.reduce((a,x)=>x.v>a.v?x:a), hi=e.filter(x=>x.v>=6).length;
+  $("uvFoot").innerHTML=`<span>Peak <b>${fmtUv(peak.v)}</b> at ${hhmm(peak.t)}</span><span><b>${hi}</b> hour${hi===1?"":"s"} at High or above</span><span><b>${e.length}</b> readings so far</span>`;
+}
+function drawUvLegend(){
+  $("uvLegend").innerHTML=UVB.map(b=>`<div class="key" style="border-left-color:${col(b.key)}"><b style="color:${col(b.key)}">${b.label}</b><span class="r">${b.range}</span><p>${b.tip}</p></div>`).join("");
+}
+function drawUv(){drawUvGauge();drawUvMap();drawUvChart();}
+
+// ---------- status ----------
+function drawStatus(errs){
+  const chip=$("chip"), n=$("notice");
+  if(mode==="live"){
+    chip.className="chip live"; $("chipText").textContent="Live · NEA";
+    $("stamp").textContent=`PSI ${hhmm(latest.timestamp)} · updated ${hhmm(latest.updated)} SGT`;
+    n.classList.toggle("show",errs.length>0);
+    n.textContent=errs.length?`Some NEA data did not load (${errs.join(", ")}). The rest is live.`:"";
+  }else{
+    chip.className="chip saved"; $("chipText").textContent="Saved NEA reading";
+    $("stamp").textContent=`PSI ${dateLbl(latest.timestamp)}, ${hhmm(latest.timestamp)} SGT`;
+    n.classList.add("show");
+    n.innerHTML=`<b>Not live.</b> This view could not reach data.gov.sg, so it shows the real NEA PSI reading from ${dateLbl(latest.timestamp)}, ${hhmm(latest.timestamp)} SGT that was saved when the page was built. UV, wind and hourly history are left empty rather than estimated. Open the HTML file in a browser tab for live data.`;
+  }
+}
+
+// ---------- render + load ----------
+function setSeries(k){series=k;drawSeg();drawMap();drawTiles();drawChart();}
+function renderAll(errs){drawGauge();drawMap();drawTiles();drawSeg();drawChart();drawWind();drawUv();drawStatus(errs||[]);}
+let loading=false;
+async function load(){
+  if(loading) return; loading=true;
+  $("chipText").textContent="Checking data.gov.sg…";
+  const errs=[];
+  const [l,h,w,u]=await Promise.allSettled([fetchLatestPsi(),fetchPsiHistory(),fetchWind(),fetchUv()]);
+  if(l.status==="fulfilled"){ latest=l.value; mode="live"; }
+  else if(!latest||mode!=="live"){ latest=SAVED_READING; mode="saved"; }
+  history = h.status==="fulfilled" ? h.value : (mode==="live"? null : null);
+  wind    = w.status==="fulfilled" ? w.value : null;
+  uv      = u.status==="fulfilled" ? u.value : null;
+  if(mode==="live"){
+    // keep the newest reading consistent between the dial and the chart
+    if(history && history[history.length-1].timestamp<latest.timestamp) history=[...history.slice(1),latest];
+    if(h.status!=="fulfilled") errs.push("PSI history");
+    if(w.status!=="fulfilled") errs.push("wind");
+    if(u.status!=="fulfilled") errs.push("UV index");
+  }
+  renderAll(errs); loading=false;
+}
+drawLegend(); drawUvLegend(); drawUvMap();
+$("refresh").addEventListener("click",load);
+load();
+setInterval(load,REFRESH_MS);
+})();
+</script>
+</body>
+</html>
